@@ -24,8 +24,8 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   // 5 ms (robot) + 2 ms (controller 1) + 2 ms (controller 2) = 9 ms
   // 9 ms / 10 ms -> 90% allocated
 
-  m_chooser.SetDefaultOption(kAutoNameDefault, kAutoNameDefault);
-  m_chooser.AddOption(kAutoNameCustom, kAutoNameCustom);
+  // m_chooser.SetDefaultOption(kAutoNameDefault, kAutoNameDefault);
+  // m_chooser.AddOption(kAutoNameCustom, kAutoNameCustom);
   frc::SmartDashboard::PutData("Auto Modes", &m_chooser);
 }
 
@@ -50,26 +50,69 @@ void Robot::RobotPeriodic() {}
  * if-else structure below with additional strings. If using the SendableChooser
  * make sure to add them to the chooser code above as well.
  */
-void Robot::AutonomousInit() {
-  m_autoSelected = m_chooser.GetSelected();
-  // m_autoSelected = SmartDashboard::GetString("Auto Selector",
-  //     kAutoNameDefault);
-  wpi::print("Auto selected: {}\n", m_autoSelected);
 
-  if (m_autoSelected == kAutoNameCustom) {
-    // Custom Auto goes here
-  } else {
-    // Default Auto goes here
+void Robot::moveFwd(double speed){
+  if(speed > 1.0){
+    speed = 1.0;
   }
+
+  if(speed < 0.0){
+    speed = 0.0;
+  }
+
+  m_in1.Set(true);
+  m_in2.Set(false);
+  m_pwm.SetSpeed(speed);
+
+}
+
+void Robot::stopMotor(){
+  m_in1.Set(false);
+  m_in2.Set(false);
+  m_pwm.SetSpeed(0);
+}
+
+void Robot::AutonomousInit() {
+  m_timer.Reset();
+  m_timer.Start();
+}
+
+void Robot::moveBwd(double speed){
+  if(speed > 1.0){
+    speed = 1.0;
+  }
+  if(speed < 0.0){
+    speed = 0.0;
+  }
+  m_in1.Set(false);
+  m_in2.Set(true);
+  m_pwm.SetSpeed(speed);
 }
 
 void Robot::AutonomousPeriodic() {
-  if (m_autoSelected == kAutoNameCustom) {
-    // Custom Auto goes here
-  } else {
-    // Default Auto goes here
+  units::time::second_t time = m_timer.Get();
+
+  if(time < 5_s){
+    moveFwd(1);
   }
+  else if(time < 7_s){
+    stopMotor();
+  }
+  else if(time < 12_s){
+    moveBwd(1);
+  }
+  else{
+    stopMotor();
+  }
+
 }
+
+//TODO: add use the PhysicsSim classes (like DifferentialDrivetrainSim or SwerveDriveSim), 
+//read the motor voltages, pass them to the simulator object, and then update your odometry with the new calculated position.
+void Robot::SimulationPeriodic(){
+
+}
+
 
 void Robot::TeleopInit() {}
 
