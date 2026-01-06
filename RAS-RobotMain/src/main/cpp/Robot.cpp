@@ -37,7 +37,7 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
 
   //PID Tolerance
   //we are done if we are within 0.05 meters of target
-  m_pid.SetTolerance(0.05)
+  m_pid.SetTolerance(0.05);
 }
 
 /**
@@ -95,7 +95,7 @@ void Robot::AutonomousInit() {
 //   m_pwm.SetSpeed(speed);
 // }
 
-void move(double speed){
+void Robot::move(double speed){
   speed = std::clamp(speed, -1.0, 1.0);
   if(speed > 0){
     m_in1.Set(true);
@@ -144,6 +144,8 @@ void Robot::DisabledPeriodic() {}
 void Robot::TestInit() {}
 
 void Robot::TestPeriodic() {}
+
+void Robot::SimulationPeriodic() {}
 
 #ifndef RUNNING_FRC_TESTS
 int main() {
