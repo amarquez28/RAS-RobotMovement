@@ -32,8 +32,10 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   //must be calculted for specific robot
   //formula (wheel circumfrence (M))/ (Encoder pulses per revolution)
   // Example: 6 inch wheel (0.1524m dia) -> Circumference = 0.478m
+  // Our encoder resolution is 751.88
+  // Our circumfrence is 0.226195
   // If encoder has 360 ticks per rev: 0.478 / 360 = 0.00132
-  m_encoder.SetDistancePerPulse(0.00132); // Replace with our calculated value
+  m_encoder.SetDistancePerPulse(0.0003008392); // Replace with our calculated value
 
   //PID Tolerance
   //we are done if we are within 0.05 meters of target

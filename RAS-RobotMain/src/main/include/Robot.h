@@ -38,8 +38,8 @@ class Robot : public frc::TimesliceRobot {
   frc::PWM m_pwm{0};
   frc::DigitalOutput m_in1{0};
   frc::DigitalOutput m_in2{1};
-  frc::DigitalOutput m_in3{2};
-  frc::DigitalOutput m_in4{3};
-  frc::Encoder m_encoder{4,5}; //Encoders use two Digital Input ports (channels). Let's assume 4 and 5.
+  // frc::DigitalOutput m_in3{2};
+  // frc::DigitalOutput m_in4{3};
+  frc::Encoder m_encoder{2,3}; //Encoders use two Digital Input ports (channels). Let's assume 4 and 5.
   frc::PIDController m_pid{1.0, 0.0, 0.0}; //P = 1.0 means if we are 1 meter away, go at speed 1.0 (full speed).
 };
