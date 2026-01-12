@@ -42,4 +42,5 @@ class Robot : public frc::TimesliceRobot {
   frc::DigitalOutput m_in4{3};
   frc::Encoder m_encoder{4,5}; //Encoders use two Digital Input ports (channels). Let's assume 4 and 5.
   frc::PIDController m_pid{1.0, 0.0, 0.0}; //P = 1.0 means if we are 1 meter away, go at speed 1.0 (full speed).
+  frc::AnalogInput m_hallSensor{0}; //Hall sensor uses analog input. Let´s assume channel 0.
 };

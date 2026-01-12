@@ -7,9 +7,21 @@
 #include <frc/livewindow/LiveWindow.h>
 #include <frc/smartdashboard/SmartDashboard.h>
 #include <wpi/print.h>
+#include <frc/AnalogInput.h>
 
 // Run robot periodic() functions for 5 ms, and run controllers every 10 ms
 Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
+
+  NetworkTable *table;
+  AHRS *ahrs;
+  LiveWindow *lw;
+  int autoLoopCounter;
+
+  table(NULL),
+  ahrs(NULL),
+  lw(NULL),
+  autoLoopCounter(0)
+
   // LiveWindow causes drastic overruns in robot periodic functions that will
   // interfere with controllers
   frc::LiveWindow::DisableAllTelemetry();
@@ -51,6 +63,24 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
 void Robot::RobotPeriodic() {
   frc::SmartDashboard::PutNumber("Encoder Dist", m_encoder.GetDistance());
   frc::SmartDashboard::PutNumber("Encoder Rate", m_encoder.GetRate());
+
+  table = NetworkTable::GetTable("datatable");
+  lw = LiveWindow::GetInstance();
+  try {
+    /* Communicate w/navX-MXP via the MXP SPI Bus.                                       */
+    /* Alternatively:  I2C::Port::kMXP, SerialPort::Port::kMXP or SerialPort::Port::kUSB */
+    /* See http://navx-mxp.kauailabs.com/guidance/selecting-an-interface/ for details.   */
+    ahrs = new AHRS(SPI::Port::kMXP);
+  } 
+  catch (std::exception ex ) {
+    std::string err_string = "Error instantiating navX-MXP:  ";
+    err_string += ex.what();
+    DriverStation::ReportError(err_string.c_str());
+  }
+  if ( ahrs ) {
+    LiveWindow::GetInstance()->AddSensor("IMU", "Gyro", ahrs);
+  }
+
 }
 
 // void Robot::moveFwd(double speed){
@@ -81,6 +111,8 @@ void Robot::AutonomousInit() {
   m_pid.Reset();
   //set our goal: move forward 1.0 meter
   m_pid.SetSetpoint(1.0);
+
+  autoLoopCounter = 0;
 }
 
 // void Robot::moveBwd(double speed){
@@ -113,11 +145,36 @@ void Robot::move(double speed){
 }
 
 void Robot::AutonomousPeriodic() {
+  if(autoLoopCounter < 100) //Check if we've completed 100 loops (approximately 2 seconds)
+  {
+    autoLoopCounter++;
+  }
+
+  //navX-MXP IMU data
+  frc::SmartDashboard::PutBoolean( "IMU_Connected",        ahrs->IsConnected());
+  frc::SmartDashboard::PutNumber(  "IMU_Yaw",              ahrs->GetYaw());
+  frc::SmartDashboard::PutNumber(  "IMU_Pitch",            ahrs->GetPitch());
+  frc::SmartDashboard::PutNumber(  "IMU_Roll",             ahrs->GetRoll());
+  frc::SmartDashboard::PutNumber(  "IMU_CompassHeading",   ahrs->GetCompassHeading());
+  frc::SmartDashboard::PutNumber(  "IMU_Update_Count",     ahrs->GetUpdateCount());
+  frc::SmartDashboard::PutNumber(  "IMU_Byte_Count",       ahrs->GetByteCount());
+
+  //Hall sensor test - detect magnet
+  double hallVoltage = m_hallSensor.GetVoltage(); 
+  const double magnetThreshold = 2.5; //example threshold voltage
+  if (hallVoltage > magnetThreshold) {
+    // Magnet detected
+    frc::SmartDashboard::PutString("Magnet Status", "Detected");
+    frc::SmartDashboard::PutString(hallVoltage);
+  } else {
+    // No magnet detected
+    frc::SmartDashboard::PutString("Magnet Status", "Not Detected");
+  }
 
   //get data: read the current distance from encoder
   double currentDistance = m_encoder.GetDistance();
 
-  //calculate: ask pid controller what speed we need to reach the setpoint 
+  //calculate: ask pid controller what speed we need to reach the setpoint  
   //this returns a value between -1.0(full reverse) and 1.0 (full forward)
   double outputSpeed = m_pid.Calculate(currentDistance);
   outputSpeed = std::clamp(outputSpeed, -1.0, 1.0);
