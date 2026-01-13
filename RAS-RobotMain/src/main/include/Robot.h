@@ -14,6 +14,11 @@
 #include <frc/Encoder.h> //library for encoders
 #include <frc/controller/PIDController.h> //library for PID
 
+#include "rev/ServoHub.h" //Servo hub lib
+
+#include <frc/AnalogInput.h> //hall sensor test
+#include <frc/DigitalInput.h> //hall sensor test
+
 class Robot : public frc::TimesliceRobot {
  public:
   Robot();
@@ -35,11 +40,25 @@ class Robot : public frc::TimesliceRobot {
   frc::SendableChooser<std::string> m_chooser;
   std::string m_autoSelected;
   frc::Timer m_timer;
-  frc::PWM m_pwm{0};
+  frc::PWM m_pwm{1};
   frc::DigitalOutput m_in1{0};
   frc::DigitalOutput m_in2{1};
   // frc::DigitalOutput m_in3{2};
   // frc::DigitalOutput m_in4{3};
   frc::Encoder m_encoder{2,3}; //Encoders use two Digital Input ports (channels). Let's assume 4 and 5.
   frc::PIDController m_pid{1.0, 0.0, 0.0}; //P = 1.0 means if we are 1 meter away, go at speed 1.0 (full speed).
+
+  //hall sensor inputs
+  frc::AnalogInput m_hallAnalog{0};   // AI0
+  frc::DigitalInput m_hallDigital{8}; // DIO 8
+
+  //servohub id and channel configuration
+  static constexpr int kServoHubId = 20;
+  rev::servohub::ServoHub m_servoHub{kServoHubId};
+
+  rev::servohub::ServoChannel& m_servo0{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId0)};
+
+  rev::servohub::ServoChannel& m_servo1{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId1)};
+
+  rev::servohub::ServoChannel& m_servo3{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId3)};
 };
