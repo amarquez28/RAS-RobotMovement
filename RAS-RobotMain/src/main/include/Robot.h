@@ -19,6 +19,8 @@
 #include <frc/AnalogInput.h> //hall sensor test
 #include <frc/DigitalInput.h> //hall sensor test
 
+#include <frc/SerialPort.h> //UART communication with Roboclaw
+
 class Robot : public frc::TimesliceRobot {
  public:
   Robot();
@@ -47,6 +49,19 @@ class Robot : public frc::TimesliceRobot {
   // frc::DigitalOutput m_in4{3};
   frc::Encoder m_encoder{2,3}; //Encoders use two Digital Input ports (channels). Let's assume 4 and 5.
   frc::PIDController m_pid{1.0, 0.0, 0.0}; //P = 1.0 means if we are 1 meter away, go at speed 1.0 (full speed).
+
+  //Roboclaw
+  frc::SerialPort m_roboclaw{38400, frc::SerialPort::Port::kMXP};
+  static constexpr uint8_t kRoboClawAddr = 0x80; //Serial Address
+
+  uint16_t RoboClawCRC16(const uint8_t* data, int len);
+  void RoboClawSend3(uint8_t cmd, uint8_t value);
+
+  void RoboClawM1Forward(uint8_t speed);
+  void RoboClawM1Backward(uint8_t speed);
+  void RoboClawM2Forward(uint8_t speed);
+  void RoboClawM2Backward(uint8_t speed);
+  void RoboClawStop();
 
   //hall sensor inputs
   frc::AnalogInput m_hallAnalog{0};   // AI0
