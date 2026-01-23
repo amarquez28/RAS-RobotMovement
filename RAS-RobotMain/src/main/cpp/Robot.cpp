@@ -45,11 +45,11 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   // Our encoder resolution is 751.88
   // Our circumfrence is 0.226195
   // If encoder has 360 ticks per rev: 0.478 / 360 = 0.00132
-  m_encoder.SetDistancePerPulse(0.0003008392); // Replace with our calculated value
+  //m_encoder.SetDistancePerPulse(0.0003008392); // Replace with our calculated value
 
   //PID Tolerance
   //we are done if we are within 0.05 meters of target
-  m_pid.SetTolerance(0.05);
+  //m_pid.SetTolerance(0.05);
 
   m_servo0.SetPowered(true);
   m_servo1.SetPowered(true);
@@ -97,6 +97,74 @@ void Robot::RoboClawSend3(uint8_t cmd, uint8_t value) {
   m_roboclaw.Write(reinterpret_cast<const char*>(out), 5);
 }
 
+//Packet Reading, timestamps help us to make sure we have received all bytes before handling data
+static bool ReadExact(frc::SerialPort& port, uint8_t* out, int n, units::second_t timeout) {
+  auto start = frc::Timer::GetFPGATimestamp();
+  int got = 0;
+
+  while (got < n) {
+    char buf[32];
+    int want = std::min(n - got, (int)sizeof(buf));
+    int r = port.Read(buf, want);
+
+    if (r > 0) {
+      std::memcpy(out + got, buf, r);
+      got += r;
+    }
+
+    if ((frc::Timer::GetFPGATimestamp() - start) > timeout) {
+      return false; // timeout if not all bytes are received 
+    }
+  }
+  return true;
+}
+
+bool Robot::RoboClawReadEncoder(uint8_t cmd, uint32_t& count, uint8_t& status) {
+  // Send request: [Addr, cmd, CRC16]
+  uint8_t req[2] = {kRoboClawAddr, cmd};
+  uint16_t reqCrc = RoboClawCRC16(req, 2);
+
+  uint8_t out[4] = {
+    kRoboClawAddr, cmd,
+    static_cast<uint8_t>((reqCrc >> 8) & 0xFF),
+    static_cast<uint8_t>(reqCrc & 0xFF)
+  };
+
+  m_roboclaw.Write(reinterpret_cast<const char*>(out), 4);
+
+  // Response: 4 bytes count + 1 status + 2 CRC = 7 bytes
+  uint8_t resp[7];
+  if (!ReadExact(m_roboclaw, resp, 7, 20_ms)) return false;
+
+  // Parse encoder count (big-endian)
+  count = (uint32_t(resp[0]) << 24) |
+          (uint32_t(resp[1]) << 16) |
+          (uint32_t(resp[2]) << 8)  |
+          (uint32_t(resp[3]) << 0);
+
+  status = resp[4];
+
+  // Verify response CRC:
+  uint16_t rxCrc = (uint16_t(resp[5]) << 8) | uint16_t(resp[6]);
+
+  // CRC covers: [Addr, cmd, resp[0..4]]
+  uint8_t check[7];
+  check[0] = kRoboClawAddr;
+  check[1] = cmd;
+  std::memcpy(&check[2], resp, 5);
+
+  uint16_t calc = RoboClawCRC16(check, 7);
+  return calc == rxCrc;
+}
+
+bool Robot::RoboClawReadEncoderM1(uint32_t& count, uint8_t& status) {
+  return RoboClawReadEncoder(16, count, status);
+  }
+
+  bool Robot::RoboClawReadEncoderM2(uint32_t& count, uint8_t& status) {
+  return RoboClawReadEncoder(17, count, status);
+  }
+
 //Motor command wrappers
 void Robot::RoboClawM1Forward(uint8_t speed)  { RoboClawSend3(0, speed); } // cmd 0
 void Robot::RoboClawM1Backward(uint8_t speed) { RoboClawSend3(1, speed); } // cmd 1
@@ -117,13 +185,25 @@ void Robot::RoboClawStop() {
  * LiveWindow and SmartDashboard integrated updating.
  */
 void Robot::RobotPeriodic() {
-  frc::SmartDashboard::PutNumber("Encoder Dist", m_encoder.GetDistance());
-  frc::SmartDashboard::PutNumber("Encoder Rate", m_encoder.GetRate());
+  //frc::SmartDashboard::PutNumber("Encoder Dist", m_encoder.GetDistance());
+  //frc::SmartDashboard::PutNumber("Encoder Rate", m_encoder.GetRate());
 
   //hall sensor dashboard values
   frc::SmartDashboard::PutNumber("Hall Voltage (V)", m_hallAnalog.GetVoltage());
   frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
   frc::SmartDashboard::PutBoolean("Hall Digital (DIO8)", m_hallDigital.Get());
+
+  //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
+  uint32_t e1, e2;
+  uint8_t s1, s2;
+
+  bool ok1 = RoboClawReadEncoderM1(e1, s1);
+  bool ok2 = RoboClawReadEncoderM2(e2, s2);
+
+  frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok1);
+  frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok2);
+  if (ok1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e1);
+  if (ok2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e2);
 }
 
 // void Robot::moveFwd(double speed){
@@ -141,11 +221,11 @@ void Robot::RobotPeriodic() {
 
 // }
 
-void Robot::stopMotor(){
+/*void Robot::stopMotor(){
   m_in1.Set(false);
   m_in2.Set(false);
   m_pwm.SetSpeed(0);
-}
+}*/
 
 static frc::I2C imu{frc::I2C::Port::kOnboard, 0x68};
 
@@ -170,10 +250,10 @@ static int16_t ToInt16(uint8_t hi, uint8_t lo) {
 void Robot::AutonomousInit() {
   m_timer.Reset();
   m_timer.Start();
-  m_encoder.Reset();
-  m_pid.Reset();
+  //m_encoder.Reset();
+  //m_pid.Reset();
   //set our goal: move forward 1.0 meter
-  m_pid.SetSetpoint(1.0);
+  //m_pid.SetSetpoint(1.0);
 
   // Force known start position
   m_servo0.SetPulseWidth(pulse);
@@ -205,7 +285,7 @@ static void InitIMU() {
 //   m_pwm.SetSpeed(speed);
 // }
 
-void Robot::move(double speed){
+/*void Robot::move(double speed){
   speed = std::clamp(speed, -1.0, 1.0);
   if(speed > 0){
     m_in1.Set(true);
@@ -220,7 +300,7 @@ void Robot::move(double speed){
     m_in2.Set(false);
   }
   m_pwm.SetSpeed(std::abs(speed));
-}
+} */
 
 static void UpdateIMUDashboard() {
   // --- WHO_AM_I ---
