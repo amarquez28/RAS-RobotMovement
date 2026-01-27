@@ -50,14 +50,14 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   //PID Tolerance
   //we are done if we are within 0.05 meters of target
   //m_pid.SetTolerance(0.05);
-
+/*
   m_servo0.SetPowered(true);
   m_servo1.SetPowered(true);
   m_servo3.SetPowered(true);
 
   m_servo0.SetEnabled(true);
   m_servo1.SetEnabled(true);
-  m_servo3.SetEnabled(true);
+  m_servo3.SetEnabled(true); */
 
   InitIMU();
 
@@ -256,9 +256,9 @@ void Robot::AutonomousInit() {
   //m_pid.SetSetpoint(1.0);
 
   // Force known start position
-  m_servo0.SetPulseWidth(pulse);
+ /* m_servo0.SetPulseWidth(pulse);
   m_servo1.SetPulseWidth(pulse);
-  m_servo3.SetPulseWidth(pulse);
+  m_servo3.SetPulseWidth(pulse); */
 
 }
 
