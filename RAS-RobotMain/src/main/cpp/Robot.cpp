@@ -9,7 +9,8 @@
 #include <wpi/print.h>
 #include <frc/I2C.h>
 #include <cstdint>
-#include <algorithm>  // for std::clamp, required for compilation
+#include <cstring>
+#include <algorithm> 
 
 int pulse = 500;     // center position
 int dir = 1;
@@ -50,20 +51,22 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   //PID Tolerance
   //we are done if we are within 0.05 meters of target
   //m_pid.SetTolerance(0.05);
-/*
+
   m_servo0.SetPowered(true);
   m_servo1.SetPowered(true);
+  m_servo2.SetPowered(true);
   m_servo3.SetPowered(true);
 
   m_servo0.SetEnabled(true);
   m_servo1.SetEnabled(true);
-  m_servo3.SetEnabled(true); */
+  m_servo2.SetEnabled(true);
+  m_servo3.SetEnabled(true); 
 
   InitIMU();
 
   // RoboClaw: clean buffers & stop motors on boot
   m_roboclaw.Reset();
-  RoboClawStop();
+  RoboClawStopAll();
 }
 
 //Roboclaw Helper Functions 
@@ -81,13 +84,23 @@ uint16_t Robot::RoboClawCRC16(const uint8_t* data, int len) {
   return crc;
 }
 
+  //Clean buffer, read and discard any pending bytes
+ void Robot::RoboClawDrain(){
+  while (m_roboclaw.GetBytesReceived() > 0) {
+    char junk [64];
+    int n = std::min<int>(sizeof(junk), m_roboclaw.GetBytesReceived());
+    if (n <= 0) break;
+    m_roboclaw.Read(junk, n);
+  }
+ }
+
 //Packet Creation
-void Robot::RoboClawSend3(uint8_t cmd, uint8_t value) {
-  uint8_t pkt[3] = {kRoboClawAddr, cmd, value};
+void Robot::RoboClawSend3(uint8_t addr, uint8_t cmd, uint8_t value) {
+  uint8_t pkt[3] = {addr, cmd, value};
   uint16_t crc = RoboClawCRC16(pkt, 3);
 
   uint8_t out[5] = {
-      kRoboClawAddr,
+      addr,
       cmd,
       value,
       static_cast<uint8_t>((crc >> 8) & 0xFF),
@@ -119,13 +132,14 @@ static bool ReadExact(frc::SerialPort& port, uint8_t* out, int n, units::second_
   return true;
 }
 
-bool Robot::RoboClawReadEncoder(uint8_t cmd, uint32_t& count, uint8_t& status) {
+bool Robot::RoboClawReadEncoder(uint8_t addr, uint8_t cmd, uint32_t& count, uint8_t& status) {
+  RoboClawDrain();
   // Send request: [Addr, cmd, CRC16]
-  uint8_t req[2] = {kRoboClawAddr, cmd};
+  uint8_t req[2] = {addr, cmd};
   uint16_t reqCrc = RoboClawCRC16(req, 2);
 
   uint8_t out[4] = {
-    kRoboClawAddr, cmd,
+    addr, cmd,
     static_cast<uint8_t>((reqCrc >> 8) & 0xFF),
     static_cast<uint8_t>(reqCrc & 0xFF)
   };
@@ -149,7 +163,7 @@ bool Robot::RoboClawReadEncoder(uint8_t cmd, uint32_t& count, uint8_t& status) {
 
   // CRC covers: [Addr, cmd, resp[0..4]]
   uint8_t check[7];
-  check[0] = kRoboClawAddr;
+  check[0] = addr;
   check[1] = cmd;
   std::memcpy(&check[2], resp, 5);
 
@@ -157,23 +171,28 @@ bool Robot::RoboClawReadEncoder(uint8_t cmd, uint32_t& count, uint8_t& status) {
   return calc == rxCrc;
 }
 
-bool Robot::RoboClawReadEncoderM1(uint32_t& count, uint8_t& status) {
-  return RoboClawReadEncoder(16, count, status);
+bool Robot::RoboClawReadEncoderM1(uint8_t addr, uint32_t& count, uint8_t& status) {
+  return RoboClawReadEncoder(addr, 16, count, status);
   }
 
-  bool Robot::RoboClawReadEncoderM2(uint32_t& count, uint8_t& status) {
-  return RoboClawReadEncoder(17, count, status);
+  bool Robot::RoboClawReadEncoderM2(uint8_t addr, uint32_t& count, uint8_t& status) {
+  return RoboClawReadEncoder(addr, 17, count, status);
   }
 
 //Motor command wrappers
-void Robot::RoboClawM1Forward(uint8_t speed)  { RoboClawSend3(0, speed); } // cmd 0
-void Robot::RoboClawM1Backward(uint8_t speed) { RoboClawSend3(1, speed); } // cmd 1
-void Robot::RoboClawM2Forward(uint8_t speed)  { RoboClawSend3(4, speed); } // cmd 4
-void Robot::RoboClawM2Backward(uint8_t speed) { RoboClawSend3(5, speed); } // cmd 5
+void Robot::RoboClawM1Forward(uint8_t addr, uint8_t speed)  { RoboClawSend3(addr, 0, speed); } // cmd 0
+void Robot::RoboClawM1Backward(uint8_t addr, uint8_t speed) { RoboClawSend3(addr, 1, speed); } // cmd 1
+void Robot::RoboClawM2Forward(uint8_t addr, uint8_t speed)  { RoboClawSend3(addr, 4, speed); } // cmd 4
+void Robot::RoboClawM2Backward(uint8_t addr, uint8_t speed) { RoboClawSend3(addr, 5, speed); } // cmd 5
 
-void Robot::RoboClawStop() {
-  RoboClawM1Forward(0);
-  RoboClawM2Forward(0);
+void Robot::RoboClawStop(uint8_t addr) {
+  RoboClawM1Forward(addr, 0);
+  RoboClawM2Forward(addr, 0);
+}
+
+void Robot::RoboClawStopAll(){
+  RoboClawStop(kRoboClawAddr1);
+  RoboClawStop(kRoboClawAddr2);
 }
 
 /**
@@ -194,16 +213,19 @@ void Robot::RobotPeriodic() {
   frc::SmartDashboard::PutBoolean("Hall Digital (DIO8)", m_hallDigital.Get());
 
   //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
-  uint32_t e1, e2;
-  uint8_t s1, s2;
+  uint32_t e80_m1, e80_m2, e81_m1;
+  uint8_t s80_m1, s80_m2, s81_m1;
 
-  bool ok1 = RoboClawReadEncoderM1(e1, s1);
-  bool ok2 = RoboClawReadEncoderM2(e2, s2);
+  bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr1, e80_m1, s80_m1);
+  bool ok80_2 = RoboClawReadEncoderM2(kRoboClawAddr1, e80_m2, s80_m2);
+  bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr1, e81_m1, s81_m1);
 
-  frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok1);
-  frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok2);
-  if (ok1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e1);
-  if (ok2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e2);
+  frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok80_1);
+  frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok80_2);
+  frc::SmartDashboard::PutBoolean("RC2 Encoder1 OK", ok81_1);
+  if (ok80_1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e80_m1);
+  if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
+  if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1);
 }
 
 // void Robot::moveFwd(double speed){
@@ -256,9 +278,10 @@ void Robot::AutonomousInit() {
   //m_pid.SetSetpoint(1.0);
 
   // Force known start position
- /* m_servo0.SetPulseWidth(pulse);
+  m_servo0.SetPulseWidth(pulse);
   m_servo1.SetPulseWidth(pulse);
-  m_servo3.SetPulseWidth(pulse); */
+  m_servo2.SetPulseWidth(pulse);
+  m_servo3.SetPulseWidth(pulse); 
 
 }
 
@@ -304,7 +327,6 @@ static void InitIMU() {
 
 static void UpdateIMUDashboard() {
   // --- WHO_AM_I ---
-  fmt::print("Accessed\n");
   uint8_t who = 0;
   bool whoErr = ReadRegs(0x75, &who, 1); // WHO_AM_I = 0x75
 
@@ -375,7 +397,7 @@ void Robot::AutonomousPeriodic() {
   else{
     move(outputSpeed);
   } */
-/*
+
   if (!start) {
     counter++;
 
@@ -402,21 +424,25 @@ void Robot::AutonomousPeriodic() {
     m_servo1.SetPulseWidth(pulse);
     m_servo3.SetPulseWidth(pulse);
     frc::SmartDashboard::PutNumber("Pulse: ", pulse);
-  } */
+  } 
 
   double t = m_timer.Get().value();
   uint8_t spd = 60;  // 0-127
 
   if (t < 10.0) {
-    RoboClawM1Forward(spd);
-    RoboClawM2Forward(spd);
+    RoboClawM1Forward(kRoboClawAddr1, spd);
+    RoboClawM2Forward(kRoboClawAddr1, spd);
+    RoboClawM1Forward(kRoboClawAddr2, spd);
+    RoboClawM1Forward(kRoboClawAddr2, spd);
     return;
   } else if (t < 20.0) {
-    RoboClawM1Backward(spd);
-    RoboClawM2Backward(spd);
+    RoboClawM1Backward(kRoboClawAddr1, spd);
+    RoboClawM2Backward(kRoboClawAddr1, spd);
+    RoboClawM1Backward(kRoboClawAddr2, spd);
+    RoboClawM2Backward(kRoboClawAddr2, spd);
     return;
   } else {
-    RoboClawStop();
+    RoboClawStopAll();
     return;
   }
 }
