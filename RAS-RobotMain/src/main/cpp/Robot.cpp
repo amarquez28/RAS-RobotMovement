@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <algorithm> 
+#include <iostream>
 
 int pulse = 500;     // center position
 int dir = 1;
@@ -318,6 +319,7 @@ static void UpdateIMUDashboard() {
 }
 
 void Robot::AutonomousPeriodic() {
+  m_aprilTagReader.UpdateDashboard();
   //Servomotors movement loop
   if (!start) {
     counter++;
@@ -366,6 +368,10 @@ void Robot::AutonomousPeriodic() {
     RoboClawStopAll();
     return;
   }
+  if(m_aprilTagReader.IsConnected()){
+    std::cout << "Vision system is connected \n";
+  }
+
 }
 
 void Robot::TeleopInit() {}

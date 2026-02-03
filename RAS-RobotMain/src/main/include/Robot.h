@@ -13,13 +13,11 @@
 #include <frc/Timer.h>
 #include <frc/Encoder.h> //library for encoders
 #include <frc/controller/PIDController.h> //library for PID
-
 #include "rev/ServoHub.h" //Servo hub lib
-
 #include <frc/AnalogInput.h> //hall sensor test
 #include <frc/DigitalInput.h> //hall sensor test
-
 #include <frc/SerialPort.h> //UART communication with Roboclaw
+#include "AprilTagReader.h"
 
 class Robot : public frc::TimesliceRobot {
  public:
@@ -86,4 +84,6 @@ class Robot : public frc::TimesliceRobot {
   rev::servohub::ServoChannel& m_servo2{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};
 
   rev::servohub::ServoChannel& m_servo3{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId3)};
+
+  AprilTagReader m_aprilTagReader;
 };
