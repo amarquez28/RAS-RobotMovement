@@ -48,10 +48,6 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   // If encoder has 360 ticks per rev: 0.478 / 360 = 0.00132
   //m_encoder.SetDistancePerPulse(0.0003008392); // Replace with our calculated value
 
-  //PID Tolerance
-  //we are done if we are within 0.05 meters of target
-  //m_pid.SetTolerance(0.05);
-
   m_servo0.SetPowered(true);
   m_servo1.SetPowered(true);
   m_servo2.SetPowered(true);
@@ -204,9 +200,6 @@ void Robot::RoboClawStopAll(){
  * LiveWindow and SmartDashboard integrated updating.
  */
 void Robot::RobotPeriodic() {
-  //frc::SmartDashboard::PutNumber("Encoder Dist", m_encoder.GetDistance());
-  //frc::SmartDashboard::PutNumber("Encoder Rate", m_encoder.GetRate());
-
   //hall sensor dashboard values
   frc::SmartDashboard::PutNumber("Hall Voltage (V)", m_hallAnalog.GetVoltage());
   frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
@@ -227,27 +220,6 @@ void Robot::RobotPeriodic() {
   if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
   if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1);
 }
-
-// void Robot::moveFwd(double speed){
-//   if(speed > 1.0){
-//     speed = 1.0;
-//   }
-
-//   if(speed < 0.0){
-//     speed = 0.0;
-//   }
-
-//   m_in1.Set(true);
-//   m_in2.Set(false);
-//   m_pwm.SetSpeed(speed);
-
-// }
-
-/*void Robot::stopMotor(){
-  m_in1.Set(false);
-  m_in2.Set(false);
-  m_pwm.SetSpeed(0);
-}*/
 
 static frc::I2C imu{frc::I2C::Port::kOnboard, 0x68};
 
@@ -272,10 +244,6 @@ static int16_t ToInt16(uint8_t hi, uint8_t lo) {
 void Robot::AutonomousInit() {
   m_timer.Reset();
   m_timer.Start();
-  //m_encoder.Reset();
-  //m_pid.Reset();
-  //set our goal: move forward 1.0 meter
-  //m_pid.SetSetpoint(1.0);
 
   // Force known start position
   m_servo0.SetPulseWidth(pulse);
@@ -295,35 +263,6 @@ static void InitIMU() {
   // Accel full-scale: ±2g (ACCEL_CONFIG 0x1C = 0x00)
   WriteReg(0x1C, 0x00);
 }
-
-// void Robot::moveBwd(double speed){
-//   if(speed > 1.0){
-//     speed = 1.0;
-//   }
-//   if(speed < 0.0){
-//     speed = 0.0;
-//   }
-//   m_in1.Set(false);
-//   m_in2.Set(true);
-//   m_pwm.SetSpeed(speed);
-// }
-
-/*void Robot::move(double speed){
-  speed = std::clamp(speed, -1.0, 1.0);
-  if(speed > 0){
-    m_in1.Set(true);
-    m_in2.Set(false);
-  }
-  else if(speed < 0){
-    m_in1.Set(false);
-    m_in2.Set(true);
-  }
-  else{
-    m_in1.Set(false);
-    m_in2.Set(false);
-  }
-  m_pwm.SetSpeed(std::abs(speed));
-} */
 
 static void UpdateIMUDashboard() {
   // --- WHO_AM_I ---
@@ -379,25 +318,7 @@ static void UpdateIMUDashboard() {
 }
 
 void Robot::AutonomousPeriodic() {
-
-  //get data: read the current distance from encoder
-  //double currentDistance = m_encoder.GetDistance();
-
-  //calculate: ask pid controller what speed we need to reach the setpoint 
-  //this returns a value between -1.0(full reverse) and 1.0 (full forward)
-  //double outputSpeed = m_pid.Calculate(currentDistance);
-  //outputSpeed = std::clamp(outputSpeed, -1.0, 1.0);
-
-  //actuate: send the data to motor functions
-
-  //check if we are at the distance(within tolerance)
-  /*if(m_pid.AtSetpoint()){
-    stopMotor();
-  }
-  else{
-    move(outputSpeed);
-  } */
-
+  //Servomotors movement loop
   if (!start) {
     counter++;
 
