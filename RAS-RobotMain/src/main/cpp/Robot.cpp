@@ -13,7 +13,9 @@
 #include <algorithm> 
 #include <iostream>
 
-int pulse = 500;     // center position
+int HallServoInitPos = 500; //Closed position
+int HallServoOpenPos = 1500;  //Open Position
+int pulse = 500;
 int dir = 1;
 int counter = 0;
 bool start = false;
@@ -201,25 +203,33 @@ void Robot::RoboClawStopAll(){
  * LiveWindow and SmartDashboard integrated updating.
  */
 void Robot::RobotPeriodic() {
+  //Magnetic orbs hatch door function
+  if (m_hallDigital.Get() == false) {
+    m_servo0.SetPulseWidth(HallServoOpenPos);
+  }
+  else {
+    m_servo0.SetPulseWidth(HallServoInitPos);
+  } 
+  frc::SmartDashboard::PutNumber("Current servo 0 location", m_servo0.GetPulseWidth());
   //hall sensor dashboard values
   frc::SmartDashboard::PutNumber("Hall Voltage (V)", m_hallAnalog.GetVoltage());
   frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
   frc::SmartDashboard::PutBoolean("Hall Digital (DIO8)", m_hallDigital.Get());
-
+  /*
   //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
   uint32_t e80_m1, e80_m2, e81_m1;
   uint8_t s80_m1, s80_m2, s81_m1;
 
   bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr1, e80_m1, s80_m1);
   bool ok80_2 = RoboClawReadEncoderM2(kRoboClawAddr1, e80_m2, s80_m2);
-  bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr1, e81_m1, s81_m1);
+  bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr2, e81_m1, s81_m1);
 
   frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok80_1);
   frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok80_2);
   frc::SmartDashboard::PutBoolean("RC2 Encoder1 OK", ok81_1);
   if (ok80_1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e80_m1);
   if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
-  if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1);
+  if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1); */
 }
 
 static frc::I2C imu{frc::I2C::Port::kOnboard, 0x68};
@@ -247,11 +257,7 @@ void Robot::AutonomousInit() {
   m_timer.Start();
 
   // Force known start position
-  m_servo0.SetPulseWidth(pulse);
-  m_servo1.SetPulseWidth(pulse);
-  m_servo2.SetPulseWidth(pulse);
-  m_servo3.SetPulseWidth(pulse); 
-
+  m_servo0.SetPulseWidth(HallServoInitPos);
 }
 
 static void InitIMU() {
@@ -320,35 +326,7 @@ static void UpdateIMUDashboard() {
 
 void Robot::AutonomousPeriodic() {
   m_aprilTagReader.UpdateDashboard();
-  //Servomotors movement loop
-  if (!start) {
-    counter++;
-
-    if (counter >= 25) {  // ~25 loops ≈ 0.5s
-      start = true;
-      counter = 0;
-    }
-
-    return;  // do NOT move yet
-  }
-
-  // --- Normal slow 180° sweep ---
-  counter++;
-
-  if (counter >= 10) {
-    counter = 0;
-    UpdateIMUDashboard();
-    pulse += dir * 10;
-
-    if (pulse >= 2000) dir = -1;
-    if (pulse <= 1000) dir =  1;
-
-    m_servo0.SetPulseWidth(pulse);
-    m_servo1.SetPulseWidth(pulse);
-    m_servo3.SetPulseWidth(pulse);
-    frc::SmartDashboard::PutNumber("Pulse: ", pulse);
-  } 
-
+  
   double t = m_timer.Get().value();
   uint8_t spd = 60;  // 0-127
 

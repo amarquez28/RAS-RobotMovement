@@ -63,7 +63,7 @@ class Robot : public frc::TimesliceRobot {
 
   //hall sensor inputs
   frc::AnalogInput m_hallAnalog{0};   // AI0
-  frc::DigitalInput m_hallDigital{8}; // DIO 8
+  frc::DigitalInput m_hallDigital{9}; // DIO 8
 
   //servohub id and channel configuration
   static constexpr int kServoHubId = 20;
