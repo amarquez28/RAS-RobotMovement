@@ -215,7 +215,7 @@ void Robot::RobotPeriodic() {
   frc::SmartDashboard::PutNumber("Hall Voltage (V)", m_hallAnalog.GetVoltage());
   frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
   frc::SmartDashboard::PutBoolean("Hall Digital (DIO8)", m_hallDigital.Get());
-  /*
+  
   //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
   uint32_t e80_m1, e80_m2, e81_m1;
   uint8_t s80_m1, s80_m2, s81_m1;
@@ -229,7 +229,7 @@ void Robot::RobotPeriodic() {
   frc::SmartDashboard::PutBoolean("RC2 Encoder1 OK", ok81_1);
   if (ok80_1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e80_m1);
   if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
-  if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1); */
+  if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1); 
 }
 
 static frc::I2C imu{frc::I2C::Port::kOnboard, 0x68};
@@ -329,7 +329,7 @@ void Robot::AutonomousPeriodic() {
   
   double t = m_timer.Get().value();
   uint8_t spd = 60;  // 0-127
-
+/*
   if (t < 10.0) {
     RoboClawM1Forward(kRoboClawAddr1, spd);
     RoboClawM2Forward(kRoboClawAddr1, spd);
@@ -345,7 +345,7 @@ void Robot::AutonomousPeriodic() {
   } else {
     RoboClawStopAll();
     return;
-  }
+  }*/
   if(m_aprilTagReader.IsConnected()){
     std::cout << "Vision system is connected \n";
   }
