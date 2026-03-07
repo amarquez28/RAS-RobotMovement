@@ -50,16 +50,16 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   // Our circumfrence is 0.226195
   // If encoder has 360 ticks per rev: 0.478 / 360 = 0.00132
   //m_encoder.SetDistancePerPulse(0.0003008392); // Replace with our calculated value
-/*
+
   m_servo0.SetPowered(true);
   m_servo1.SetPowered(true);
   m_servo2.SetPowered(true);
-  m_servo3.SetPowered(true); 
+  m_servo3.SetPowered(true);
 
   m_servo0.SetEnabled(true);
   m_servo1.SetEnabled(true);
   m_servo2.SetEnabled(true);
-  m_servo3.SetEnabled(true); */
+  m_servo3.SetEnabled(true); 
 
   InitIMU();
 
@@ -204,13 +204,13 @@ void Robot::RoboClawStopAll(){
  */
 void Robot::RobotPeriodic() {
   //Magnetic orbs hatch door function
-  /*if (m_hallDigital.Get() == false) {
+  if (m_hallDigital.Get() == false) {
     m_servo0.SetPulseWidth(HallServoOpenPos);
   }
   else {
     m_servo0.SetPulseWidth(HallServoInitPos);
   } 
-  frc::SmartDashboard::PutNumber("Current servo 0 location", m_servo0.GetPulseWidth()); */
+  frc::SmartDashboard::PutNumber("Current servo 0 location", m_servo0.GetPulseWidth());
   //hall sensor dashboard values
   frc::SmartDashboard::PutNumber("Hall Voltage (V)", m_hallAnalog.GetVoltage());
   frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
@@ -257,7 +257,7 @@ void Robot::AutonomousInit() {
   m_timer.Start();
 
   // Force known start position
- // m_servo0.SetPulseWidth(HallServoInitPos);
+  m_servo0.SetPulseWidth(HallServoInitPos);
 }
 
 static void InitIMU() {
@@ -329,21 +329,23 @@ void Robot::AutonomousPeriodic() {
   
   double t = m_timer.Get().value();
   uint8_t spd = 60;  // 0-127
-
+/*
   if (t < 10.0) {
     RoboClawM1Forward(kRoboClawAddr1, spd);
     RoboClawM2Forward(kRoboClawAddr1, spd);
+    RoboClawM1Forward(kRoboClawAddr2, spd);
     RoboClawM1Forward(kRoboClawAddr2, spd);
     return;
   } else if (t < 20.0) {
     RoboClawM1Backward(kRoboClawAddr1, spd);
     RoboClawM2Backward(kRoboClawAddr1, spd);
     RoboClawM1Backward(kRoboClawAddr2, spd);
+    RoboClawM2Backward(kRoboClawAddr2, spd);
     return;
   } else {
     RoboClawStopAll();
     return;
-  }
+  }*/
   if(m_aprilTagReader.IsConnected()){
     std::cout << "Vision system is connected \n";
   }

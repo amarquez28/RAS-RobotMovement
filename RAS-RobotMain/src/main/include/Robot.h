@@ -66,7 +66,7 @@ class Robot : public frc::TimesliceRobot {
   frc::DigitalInput m_hallDigital{9}; // DIO 8
 
   //servohub id and channel configuration
-  /*static constexpr int kServoHubId = 20;
+  static constexpr int kServoHubId = 20;
   rev::servohub::ServoHub m_servoHub{kServoHubId};
 
   rev::servohub::ServoChannel& m_servo0{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId0)};
@@ -75,7 +75,7 @@ class Robot : public frc::TimesliceRobot {
 
   rev::servohub::ServoChannel& m_servo2{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};
 
-  rev::servohub::ServoChannel& m_servo3{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId3)}; */
+  rev::servohub::ServoChannel& m_servo3{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId3)};
 
   AprilTagReader m_aprilTagReader;
 };
