@@ -241,9 +241,12 @@ static int16_t ToInt16(uint8_t hi, uint8_t lo) {
 void Robot::AutonomousInit() {
   m_timer.Reset();
   m_timer.Start();
+  RoboClawDrain();
 
   // Force known start position
   m_servo0.SetPulseWidth(HallServoInitPos);
+
+  
 }
 
 static void InitIMU() {
@@ -324,6 +327,7 @@ void Robot::AutonomousPeriodic() {
   frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok80_1);
   frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok80_2);
   frc::SmartDashboard::PutBoolean("RC2 Encoder1 OK", ok81_1);
+
   if (ok80_1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e80_m1);
   if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
   if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1); 
@@ -355,7 +359,9 @@ void Robot::TeleopInit() {}
 
 void Robot::TeleopPeriodic() {}
 
-void Robot::DisabledInit() {}
+void Robot::DisabledInit() {
+  RoboClawDrain();
+}
 
 void Robot::DisabledPeriodic() {}
 
