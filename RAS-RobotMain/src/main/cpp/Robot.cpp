@@ -216,20 +216,6 @@ void Robot::RobotPeriodic() {
   frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
   frc::SmartDashboard::PutBoolean("Hall Digital (DIO8)", m_hallDigital.Get());
   
-  //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
-  uint32_t e80_m1, e80_m2, e81_m1;
-  uint8_t s80_m1, s80_m2, s81_m1;
-
-  bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr1, e80_m1, s80_m1);
-  bool ok80_2 = RoboClawReadEncoderM2(kRoboClawAddr1, e80_m2, s80_m2);
-  bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr2, e81_m1, s81_m1);
-
-  frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok80_1);
-  frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok80_2);
-  frc::SmartDashboard::PutBoolean("RC2 Encoder1 OK", ok81_1);
-  if (ok80_1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e80_m1);
-  if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
-  if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1); 
 }
 
 static frc::I2C imu{frc::I2C::Port::kOnboard, 0x68};
@@ -326,26 +312,39 @@ static void UpdateIMUDashboard() {
 
 void Robot::AutonomousPeriodic() {
   m_aprilTagReader.UpdateDashboard();
+
+  //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
+  uint32_t e80_m1, e80_m2, e81_m1;
+  uint8_t s80_m1, s80_m2, s81_m1;
+
+  bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr1, e80_m1, s80_m1);
+  bool ok80_2 = RoboClawReadEncoderM2(kRoboClawAddr1, e80_m2, s80_m2);
+  bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr2, e81_m1, s81_m1);
+
+  frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok80_1);
+  frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok80_2);
+  frc::SmartDashboard::PutBoolean("RC2 Encoder1 OK", ok81_1);
+  if (ok80_1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e80_m1);
+  if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
+  if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1); 
   
   double t = m_timer.Get().value();
   uint8_t spd = 60;  // 0-127
-/*
-  if (t < 10.0) {
+
+  if (t < 3.0) {
     RoboClawM1Forward(kRoboClawAddr1, spd);
     RoboClawM2Forward(kRoboClawAddr1, spd);
     RoboClawM1Forward(kRoboClawAddr2, spd);
-    RoboClawM1Forward(kRoboClawAddr2, spd);
     return;
-  } else if (t < 20.0) {
+  } else if (t < 6.0) {
     RoboClawM1Backward(kRoboClawAddr1, spd);
     RoboClawM2Backward(kRoboClawAddr1, spd);
     RoboClawM1Backward(kRoboClawAddr2, spd);
-    RoboClawM2Backward(kRoboClawAddr2, spd);
     return;
   } else {
     RoboClawStopAll();
     return;
-  }*/
+  }
   if(m_aprilTagReader.IsConnected()){
     std::cout << "Vision system is connected \n";
   }
