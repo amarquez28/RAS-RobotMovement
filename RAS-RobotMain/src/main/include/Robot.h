@@ -57,9 +57,9 @@ class Robot : public frc::TimesliceRobot {
   void RoboClawStop(uint8_t addr);
   void RoboClawStopAll();
   //Encoder data commands
-  bool RoboClawReadEncoder(uint8_t addr, uint8_t cmd, uint32_t& count, uint8_t& status);
-  bool RoboClawReadEncoderM1(uint8_t addr, uint32_t& count, uint8_t& status);
-  bool RoboClawReadEncoderM2(uint8_t addr, uint32_t& count, uint8_t& status);
+  bool RoboClawReadEncoder(uint8_t addr, uint8_t cmd, int32_t& count, uint8_t& status);
+  bool RoboClawReadEncoderM1(uint8_t addr, int32_t& count, uint8_t& status);
+  bool RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status);
 
   //hall sensor inputs
   frc::AnalogInput m_hallAnalog{0};   // AI0

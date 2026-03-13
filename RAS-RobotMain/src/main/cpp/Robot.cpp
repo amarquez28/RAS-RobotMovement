@@ -12,6 +12,7 @@
 #include <cstring>
 #include <algorithm> 
 #include <iostream>
+#include <numbers>
 
 int HallServoInitPos = 500; //Closed position
 int HallServoOpenPos = 1500;  //Open Position
@@ -131,14 +132,16 @@ static bool ReadExact(frc::SerialPort& port, uint8_t* out, int n, units::second_
   return true;
 }
 
-bool Robot::RoboClawReadEncoder(uint8_t addr, uint8_t cmd, uint32_t& count, uint8_t& status) {
+bool Robot::RoboClawReadEncoder(uint8_t addr, uint8_t cmd, int32_t& count, uint8_t& status) {
   RoboClawDrain();
+
   // Send request: [Addr, cmd, CRC16]
   uint8_t req[2] = {addr, cmd};
   uint16_t reqCrc = RoboClawCRC16(req, 2);
 
   uint8_t out[4] = {
-    addr, cmd,
+    addr,
+    cmd,
     static_cast<uint8_t>((reqCrc >> 8) & 0xFF),
     static_cast<uint8_t>(reqCrc & 0xFF)
   };
@@ -149,15 +152,17 @@ bool Robot::RoboClawReadEncoder(uint8_t addr, uint8_t cmd, uint32_t& count, uint
   uint8_t resp[7];
   if (!ReadExact(m_roboclaw, resp, 7, 20_ms)) return false;
 
-  // Parse encoder count (big-endian)
-  count = (uint32_t(resp[0]) << 24) |
-          (uint32_t(resp[1]) << 16) |
-          (uint32_t(resp[2]) << 8)  |
-          (uint32_t(resp[3]) << 0);
+  // Parse encoder count (big-endian), then reinterpret as signed
+  uint32_t raw = (uint32_t(resp[0]) << 24) |
+                 (uint32_t(resp[1]) << 16) |
+                 (uint32_t(resp[2]) << 8)  |
+                 (uint32_t(resp[3]) << 0);
+
+  count = static_cast<int32_t>(raw);
 
   status = resp[4];
 
-  // Verify response CRC:
+  // Verify response CRC
   uint16_t rxCrc = (uint16_t(resp[5]) << 8) | uint16_t(resp[6]);
 
   // CRC covers: [Addr, cmd, resp[0..4]]
@@ -170,13 +175,13 @@ bool Robot::RoboClawReadEncoder(uint8_t addr, uint8_t cmd, uint32_t& count, uint
   return calc == rxCrc;
 }
 
-bool Robot::RoboClawReadEncoderM1(uint8_t addr, uint32_t& count, uint8_t& status) {
+bool Robot::RoboClawReadEncoderM1(uint8_t addr, int32_t& count, uint8_t& status) {
   return RoboClawReadEncoder(addr, 16, count, status);
-  }
+}
 
-  bool Robot::RoboClawReadEncoderM2(uint8_t addr, uint32_t& count, uint8_t& status) {
+bool Robot::RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status) {
   return RoboClawReadEncoder(addr, 17, count, status);
-  }
+}
 
 //Motor command wrappers
 void Robot::RoboClawM1Forward(uint8_t addr, uint8_t speed)  { RoboClawSend3(addr, 0, speed); } // cmd 0
@@ -245,8 +250,6 @@ void Robot::AutonomousInit() {
 
   // Force known start position
   m_servo0.SetPulseWidth(HallServoInitPos);
-
-  
 }
 
 static void InitIMU() {
@@ -317,7 +320,7 @@ void Robot::AutonomousPeriodic() {
   m_aprilTagReader.UpdateDashboard();
 
   //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
-  uint32_t e80_m1, e80_m2, e81_m1;
+  int32_t e80_m1, e80_m2, e81_m1;
   uint8_t s80_m1, s80_m2, s81_m1;
 
   bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr1, e80_m1, s80_m1);
@@ -331,28 +334,76 @@ void Robot::AutonomousPeriodic() {
   if (ok80_1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e80_m1);
   if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
   if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1); 
-  
-  double t = m_timer.Get().value();
-  uint8_t spd = 60;  // 0-127
+ 
+  // Encoder unit conversions
+  double wd = 0.072;
+  double wcirc = std::numbers::pi * wd;
+  double mperpul = wcirc / 758.0;
 
-  if (t < 3.0) {
-    RoboClawM1Forward(kRoboClawAddr1, spd);
-    RoboClawM2Forward(kRoboClawAddr1, spd);
-    RoboClawM1Forward(kRoboClawAddr2, spd);
-    return;
-  } else if (t < 6.0) {
-    RoboClawM1Backward(kRoboClawAddr1, spd);
-    RoboClawM2Backward(kRoboClawAddr1, spd);
-    RoboClawM1Backward(kRoboClawAddr2, spd);
-    return;
+  // PID build up
+  double xr_m_position = e80_m1 * mperpul;
+  double xl_m_position = e80_m2 * mperpul;
+
+  // Setpoints and errors
+  double x_target_meters = 10.0;
+  double xr_error_meters = x_target_meters - xr_m_position;
+  double xl_error_meters = x_target_meters - xl_m_position;
+
+  // P controller
+  double kP = 100.0;
+  double xr_controller = kP * xr_error_meters;
+  double xl_controller = kP * xl_error_meters;
+
+  // Saturation
+  if (xr_controller > 127.0) xr_controller = 127.0;
+  if (xr_controller < -127.0) xr_controller = -127.0;
+  if (xl_controller > 127.0) xl_controller = 127.0;
+  if (xl_controller < -127.0) xl_controller = -127.0;
+
+  // Tolerance
+  double tolerance = 0.05;
+  if (std::abs(xr_error_meters) <= tolerance) xr_controller = 0.0;
+  if (std::abs(xl_error_meters) <= tolerance) xl_controller = 0.0;
+
+  // Minimum command only outside tolerance
+  if (xr_controller > 0.0 && xr_controller < 25.0) xr_controller = 25.0;
+  if (xr_controller < 0.0 && xr_controller > -25.0) xr_controller = -25.0;
+
+  if (xl_controller > 0.0 && xl_controller < 25.0) xl_controller = 25.0;
+  if (xl_controller < 0.0 && xl_controller > -25.0) xl_controller = -25.0;
+
+  // Command magnitudes
+  double spdr = std::abs(xr_controller);
+  double spdl = std::abs(xl_controller);
+
+  // Command motors separately
+  if (xr_controller > 0.0) {
+    RoboClawM1Forward(kRoboClawAddr1, spdr);
+  } else if (xr_controller < 0.0) {
+    RoboClawM1Backward(kRoboClawAddr1, spdr);
   } else {
-    RoboClawStopAll();
-    return;
+    RoboClawM1Forward(kRoboClawAddr1, 0);
   }
+
+  if (xl_controller > 0.0) {
+    RoboClawM2Forward(kRoboClawAddr1, spdl);
+  } else if (xl_controller < 0.0) {
+    RoboClawM2Backward(kRoboClawAddr1, spdl);
+  } else {
+    RoboClawM2Forward(kRoboClawAddr1, 0);
+  }
+
+  frc::SmartDashboard::PutNumber("X Target", x_target_meters);
+  frc::SmartDashboard::PutNumber("XR Pos m", xr_m_position);
+  frc::SmartDashboard::PutNumber("XL Pos m", xl_m_position);
+  frc::SmartDashboard::PutNumber("XR Error m", xr_error_meters);
+  frc::SmartDashboard::PutNumber("XL Error m", xl_error_meters);
+  frc::SmartDashboard::PutNumber("XR Ctrl", xr_controller);
+  frc::SmartDashboard::PutNumber("XL Ctrl", xl_controller);
+  
   if(m_aprilTagReader.IsConnected()){
     std::cout << "Vision system is connected \n";
   }
-
 }
 
 void Robot::TeleopInit() {}
