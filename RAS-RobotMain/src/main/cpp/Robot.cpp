@@ -183,6 +183,26 @@ bool Robot::RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status)
   return RoboClawReadEncoder(addr, 17, count, status);
 }
 
+//Roboclaw encoder reset for testing
+void Robot::RoboClawResetEncoder(uint8_t addr) {
+  uint8_t pkt[2] = {addr, 20}; // command 20 = Reset Encoders
+  uint16_t crc = RoboClawCRC16(pkt, 2);
+
+  uint8_t out[4] = {
+    addr,
+    20,
+    static_cast<uint8_t>((crc >> 8) & 0xFF),
+    static_cast<uint8_t>(crc & 0xFF)
+  };
+
+  m_roboclaw.Write(reinterpret_cast<const char*>(out), 4);
+}
+
+void Robot::RoboClawResetAllEncoders() {
+  RoboClawResetEncoder(kRoboClawAddr1);
+  RoboClawResetEncoder(kRoboClawAddr2);
+}
+
 //Motor command wrappers
 void Robot::RoboClawM1Forward(uint8_t addr, uint8_t speed)  { RoboClawSend3(addr, 0, speed); } // cmd 0
 void Robot::RoboClawM1Backward(uint8_t addr, uint8_t speed) { RoboClawSend3(addr, 1, speed); } // cmd 1
@@ -246,7 +266,9 @@ static int16_t ToInt16(uint8_t hi, uint8_t lo) {
 void Robot::AutonomousInit() {
   m_timer.Reset();
   m_timer.Start();
+  RoboClawStopAll();
   RoboClawDrain();
+  RoboClawResetAllEncoders();
 
   // Force known start position
   m_servo0.SetPulseWidth(HallServoInitPos);
@@ -345,7 +367,7 @@ void Robot::AutonomousPeriodic() {
   double xl_m_position = e80_m2 * mperpul;
 
   // Setpoints and errors
-  double x_target_meters = 10.0;
+  double x_target_meters = 2.0;
   double xr_error_meters = x_target_meters - xr_m_position;
   double xl_error_meters = x_target_meters - xl_m_position;
 
@@ -355,16 +377,16 @@ void Robot::AutonomousPeriodic() {
   double xl_controller = kP * xl_error_meters;
 
   // Saturation
-  if (xr_controller > 127.0) xr_controller = 127.0;
-  if (xr_controller < -127.0) xr_controller = -127.0;
-  if (xl_controller > 127.0) xl_controller = 127.0;
-  if (xl_controller < -127.0) xl_controller = -127.0;
+  if (xr_controller > 120.0) xr_controller = 120.0;
+  if (xr_controller < -120.0) xr_controller = -120.0;
+  if (xl_controller > 120.0) xl_controller = 120.0;
+  if (xl_controller < -120.0) xl_controller = -120.0;
 
   // Tolerance
-  double tolerance = 0.05;
+  /*double tolerance = 0.05;
   if (std::abs(xr_error_meters) <= tolerance) xr_controller = 0.0;
   if (std::abs(xl_error_meters) <= tolerance) xl_controller = 0.0;
-
+*/
   // Minimum command only outside tolerance
   if (xr_controller > 0.0 && xr_controller < 25.0) xr_controller = 25.0;
   if (xr_controller < 0.0 && xr_controller > -25.0) xr_controller = -25.0;

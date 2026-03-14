@@ -61,6 +61,10 @@ class Robot : public frc::TimesliceRobot {
   bool RoboClawReadEncoderM1(uint8_t addr, int32_t& count, uint8_t& status);
   bool RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status);
 
+  //Encoder reset
+  void RoboClawResetEncoder(uint8_t addr);
+  void RoboClawResetAllEncoders();
+  
   //hall sensor inputs
   frc::AnalogInput m_hallAnalog{0};   // AI0
   frc::DigitalInput m_hallDigital{9}; // DIO 8
