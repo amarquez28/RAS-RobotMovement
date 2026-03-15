@@ -360,27 +360,35 @@ void Robot::AutonomousPeriodic() {
   // Encoder unit conversions
   double wd = 0.072;
   double wcirc = std::numbers::pi * wd;
-  double mperpul = wcirc / 758.0;
+  double x_mperpul = wcirc / 758.0;
+  double y_mperpul = wcirc / 1425.0;
 
   // PID build up
-  double xr_m_position = e80_m1 * mperpul;
-  double xl_m_position = e80_m2 * mperpul;
+  double xr_m_position = e80_m1 * x_mperpul;
+  double xl_m_position = e80_m2 * x_mperpul;
+  double y_m_position = e81_m1 * y_mperpul;
 
   // Setpoints and errors
   double x_target_meters = 2.0;
+  double y_target_meters = 1.0;
   double xr_error_meters = x_target_meters - xr_m_position;
   double xl_error_meters = x_target_meters - xl_m_position;
+  double y_error_meters = y_target_meters - y_m_position;
 
   // P controller
-  double kP = 100.0;
-  double xr_controller = kP * xr_error_meters;
-  double xl_controller = kP * xl_error_meters;
+  double x_kP = 100.0;
+  double y_kP = 100.0;
+  double xr_controller = x_kP * xr_error_meters;
+  double xl_controller = x_kP * xl_error_meters;
+  double y_controller = y_kP * y_error_meters;
 
   // Saturation
   if (xr_controller > 120.0) xr_controller = 120.0;
   if (xr_controller < -120.0) xr_controller = -120.0;
   if (xl_controller > 120.0) xl_controller = 120.0;
   if (xl_controller < -120.0) xl_controller = -120.0;
+  if (y_controller > 120.0) y_controller = 120.0;
+  if (y_controller < -120.0) y_controller = -120.0;
 
   // Tolerance
   /*double tolerance = 0.05;
@@ -394,9 +402,13 @@ void Robot::AutonomousPeriodic() {
   if (xl_controller > 0.0 && xl_controller < 25.0) xl_controller = 25.0;
   if (xl_controller < 0.0 && xl_controller > -25.0) xl_controller = -25.0;
 
+  if (y_controller > 0.0 && y_controller < 25.0) y_controller = 25.0;
+  if (y_controller < 0.0 && y_controller > -25.0) y_controller = -25.0;
+
   // Command magnitudes
   double spdr = std::abs(xr_controller);
   double spdl = std::abs(xl_controller);
+  double spdy = std::abs(y_controller);
 
   // Command motors separately
   if (xr_controller > 0.0) {
@@ -415,13 +427,25 @@ void Robot::AutonomousPeriodic() {
     RoboClawM2Forward(kRoboClawAddr1, 0);
   }
 
+  if (y_controller > 0.0) {
+    RoboClawM1Forward(kRoboClawAddr2, spdy);
+  } else if (y_controller < 0.0) {
+    RoboClawM1Backward(kRoboClawAddr2, spdy);
+  } else {
+    RoboClawM1Forward(kRoboClawAddr2, 0);
+  }
+
   frc::SmartDashboard::PutNumber("X Target", x_target_meters);
+  frc::SmartDashboard::PutNumber("Y Target", y_target_meters);
   frc::SmartDashboard::PutNumber("XR Pos m", xr_m_position);
   frc::SmartDashboard::PutNumber("XL Pos m", xl_m_position);
+  frc::SmartDashboard::PutNumber("Y Pos m", y_m_position);
   frc::SmartDashboard::PutNumber("XR Error m", xr_error_meters);
   frc::SmartDashboard::PutNumber("XL Error m", xl_error_meters);
+  frc::SmartDashboard::PutNumber("Y Error m", y_error_meters);
   frc::SmartDashboard::PutNumber("XR Ctrl", xr_controller);
   frc::SmartDashboard::PutNumber("XL Ctrl", xl_controller);
+  frc::SmartDashboard::PutNumber("Y Ctrl", y_controller);
   
   if(m_aprilTagReader.IsConnected()){
     std::cout << "Vision system is connected \n";
