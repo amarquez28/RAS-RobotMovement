@@ -3,7 +3,6 @@
 // the WPILib BSD license file in the root directory of this project.
 
 #include "Robot.h"
-
 #include <frc/livewindow/LiveWindow.h>
 #include <frc/smartdashboard/SmartDashboard.h>
 #include <wpi/print.h>
@@ -341,6 +340,19 @@ static void UpdateIMUDashboard() {
 void Robot::AutonomousPeriodic() {
   m_aprilTagReader.UpdateDashboard();
 
+  units::second_t now = frc::Timer::GetFPGATimestamp();
+  double dt = 0.0;
+  if (m_firstPidLoop) {
+    m_prevTime = now;
+    m_firstPidLoop = false;
+    return;  // skip one cycle so dt is valid next time
+  }
+  dt = (now - m_prevTime).value();
+  m_prevTime = now;
+  if (dt <= 1e-4 || dt > 0.1) {
+  dt = 0.02;  // fallback
+}
+
   //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
   int32_t e80_m1, e80_m2, e81_m1;
   uint8_t s80_m1, s80_m2, s81_m1;
@@ -360,51 +372,67 @@ void Robot::AutonomousPeriodic() {
   // Encoder unit conversions
   double wd = 0.072;
   double wcirc = std::numbers::pi * wd;
-  double x_mperpul = wcirc / 758.0;
-  double y_mperpul = wcirc / 1425.0;
+  double x_mperpul = wcirc / 758.8;
+  double y_mperpul = wcirc / 1425.1;
 
-  // PID build up
+  //Convert pulses to actual meters traveled
   double xr_m_position = e80_m1 * x_mperpul;
   double xl_m_position = e80_m2 * x_mperpul;
   double y_m_position = e81_m1 * y_mperpul;
 
-  // Setpoints and errors
-  double x_target_meters = 2.0;
+  // Setpoints
+  double x_target_meters = 0.0;
   double y_target_meters = 1.0;
+
+  //Errors
   double xr_error_meters = x_target_meters - xr_m_position;
   double xl_error_meters = x_target_meters - xl_m_position;
   double y_error_meters = y_target_meters - y_m_position;
 
-  // P controller
-  double x_kP = 100.0;
-  double y_kP = 100.0;
-  double xr_controller = x_kP * xr_error_meters;
-  double xl_controller = x_kP * xl_error_meters;
-  double y_controller = y_kP * y_error_meters;
+  // Integral
+  xr_integral += xr_error_meters * dt;
+  xl_integral += xl_error_meters * dt;
+  y_integral += y_error_meters * dt;
+  // Anti-windup clamp
+  xr_integral = std::clamp(xr_integral, -10.0, 10.0);
+  xl_integral = std::clamp(xl_integral, -10.0, 10.0);
+  y_integral = std::clamp(y_integral, -10.0, 10.0);
+
+  // Derivative
+  double xr_derivative = (xr_error_meters - xr_prevError) / dt;
+  double xl_derivative = (xl_error_meters - xl_prevError) / dt;
+  double y_derivative = (y_error_meters - y_prevError) / dt;
+
+  // PID controller
+  double xr_controller = xr_kP * xr_error_meters + xr_kI * xr_integral + xr_kD * xr_derivative;
+  double xl_controller = xl_kP * xl_error_meters + xl_kI * xl_integral + xl_kD * xl_derivative;
+  double y_controller = y_kP * y_error_meters + y_kI * y_integral + y_kD * y_derivative;
+
+  // Save error for next loop
+  xr_prevError = xr_error_meters;
+  xl_prevError = xl_error_meters;
+  y_prevError = y_error_meters;
 
   // Saturation
-  if (xr_controller > 120.0) xr_controller = 120.0;
-  if (xr_controller < -120.0) xr_controller = -120.0;
-  if (xl_controller > 120.0) xl_controller = 120.0;
-  if (xl_controller < -120.0) xl_controller = -120.0;
-  if (y_controller > 120.0) y_controller = 120.0;
-  if (y_controller < -120.0) y_controller = -120.0;
+  xr_controller = std::clamp(xr_controller, -120.0, 120.0);
+  xl_controller = std::clamp(xl_controller, -120.0, 120.0);
+  y_controller = std::clamp(y_controller, -120.0, 120.0);
 
   // Tolerance
-  /*double tolerance = 0.05;
+  /*double tolerance = 0.01;
   if (std::abs(xr_error_meters) <= tolerance) xr_controller = 0.0;
   if (std::abs(xl_error_meters) <= tolerance) xl_controller = 0.0;
 */
   // Minimum command only outside tolerance
-  if (xr_controller > 0.0 && xr_controller < 25.0) xr_controller = 25.0;
-  if (xr_controller < 0.0 && xr_controller > -25.0) xr_controller = -25.0;
+  if (xr_controller > 0.0 && xr_controller < 15.0) xr_controller = 15.0;
+  if (xr_controller < 0.0 && xr_controller > -15.0) xr_controller = -15.0;
 
-  if (xl_controller > 0.0 && xl_controller < 25.0) xl_controller = 25.0;
-  if (xl_controller < 0.0 && xl_controller > -25.0) xl_controller = -25.0;
-
-  if (y_controller > 0.0 && y_controller < 25.0) y_controller = 25.0;
-  if (y_controller < 0.0 && y_controller > -25.0) y_controller = -25.0;
-
+  if (xl_controller > 0.0 && xl_controller < 15.0) xl_controller = 15.0;
+  if (xl_controller < 0.0 && xl_controller > -15.0) xl_controller = -15.0;
+/*
+  if (y_controller > 0.0 && y_controller < 10.0) y_controller = 10.0;
+  if (y_controller < 0.0 && y_controller > -10.0) y_controller = -10.0;
+*/
   // Command magnitudes
   double spdr = std::abs(xr_controller);
   double spdl = std::abs(xl_controller);
@@ -458,6 +486,7 @@ void Robot::TeleopPeriodic() {}
 
 void Robot::DisabledInit() {
   RoboClawDrain();
+  RoboClawStopAll();
 }
 
 void Robot::DisabledPeriodic() {}

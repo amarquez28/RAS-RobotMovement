@@ -11,6 +11,7 @@
 #include <frc/PWM.h>
 #include <frc/DigitalOutput.h>
 #include <frc/Timer.h>
+#include <units/time.h>
 #include <frc/Encoder.h> //library for encoders
 #include <frc/controller/PIDController.h> //library for PID
 #include "rev/ServoHub.h" //Servo hub lib
@@ -64,7 +65,7 @@ class Robot : public frc::TimesliceRobot {
   //Encoder reset
   void RoboClawResetEncoder(uint8_t addr);
   void RoboClawResetAllEncoders();
-  
+
   //hall sensor inputs
   frc::AnalogInput m_hallAnalog{0};   // AI0
   frc::DigitalInput m_hallDigital{9}; // DIO 8
@@ -72,14 +73,41 @@ class Robot : public frc::TimesliceRobot {
   //servohub id and channel configuration
   static constexpr int kServoHubId = 20;
   rev::servohub::ServoHub m_servoHub{kServoHubId};
-
   rev::servohub::ServoChannel& m_servo0{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId0)};
-
   rev::servohub::ServoChannel& m_servo1{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId1)};
-
   rev::servohub::ServoChannel& m_servo2{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};
-
   rev::servohub::ServoChannel& m_servo3{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId3)};
 
-  AprilTagReader m_aprilTagReader;
+  //PID Tuning
+  // Gains
+double xl_kP = 0.0;
+double xl_kI = 0.0;
+double xl_kD = 0.0;
+double xr_kP = 0.0;
+double xr_kI = 0.0;
+double xr_kD = 0.0;
+double y_kP = 1200.0;
+double y_kI = 2.0;
+double y_kD = 5.0;
+double theta_kP = 150.0;
+double theta_kI = 0.0;
+double theta_kD = 0.0;
+
+// Right wheel PID state
+double xr_integral = 0.0;
+double xr_prevError = 0.0;
+
+// Left wheel PID state
+double xl_integral = 0.0;
+double xl_prevError = 0.0;
+
+//Strafe wheel PID state
+double y_integral = 0.0;
+double y_prevError = 0.0;
+
+// Time tracking
+units::second_t m_prevTime = 0_s;
+bool m_firstPidLoop = true;
+
+AprilTagReader m_aprilTagReader;
 };
