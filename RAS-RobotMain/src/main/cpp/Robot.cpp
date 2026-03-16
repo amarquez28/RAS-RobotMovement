@@ -381,8 +381,8 @@ void Robot::AutonomousPeriodic() {
   double y_m_position = e81_m1 * y_mperpul;
 
   // Setpoints
-  double x_target_meters = 0.0;
-  double y_target_meters = 1.0;
+  double x_target_meters = 1.0;
+  double y_target_meters = 0.0;
 
   //Errors
   double xr_error_meters = x_target_meters - xr_m_position;
@@ -414,22 +414,23 @@ void Robot::AutonomousPeriodic() {
   y_prevError = y_error_meters;
 
   // Saturation
-  xr_controller = std::clamp(xr_controller, -120.0, 120.0);
-  xl_controller = std::clamp(xl_controller, -120.0, 120.0);
-  y_controller = std::clamp(y_controller, -120.0, 120.0);
+  xr_controller = std::clamp(xr_controller, -115.0, 115.0);
+  xl_controller = std::clamp(xl_controller, -115.0, 115.0);
+  y_controller = std::clamp(y_controller, -115.0, 115.0);
 
   // Tolerance
   /*double tolerance = 0.01;
   if (std::abs(xr_error_meters) <= tolerance) xr_controller = 0.0;
   if (std::abs(xl_error_meters) <= tolerance) xl_controller = 0.0;
-*/
+  if (std::abs(y_error_meters) <= tolerance) y_controller = 0.0;
+
   // Minimum command only outside tolerance
   if (xr_controller > 0.0 && xr_controller < 15.0) xr_controller = 15.0;
   if (xr_controller < 0.0 && xr_controller > -15.0) xr_controller = -15.0;
 
   if (xl_controller > 0.0 && xl_controller < 15.0) xl_controller = 15.0;
   if (xl_controller < 0.0 && xl_controller > -15.0) xl_controller = -15.0;
-/*
+
   if (y_controller > 0.0 && y_controller < 10.0) y_controller = 10.0;
   if (y_controller < 0.0 && y_controller > -10.0) y_controller = -10.0;
 */

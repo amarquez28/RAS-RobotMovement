@@ -80,16 +80,16 @@ class Robot : public frc::TimesliceRobot {
 
   //PID Tuning
   // Gains
-double xl_kP = 0.0;
-double xl_kI = 0.0;
-double xl_kD = 0.0;
-double xr_kP = 0.0;
-double xr_kI = 0.0;
-double xr_kD = 0.0;
-double y_kP = 1200.0;
+double xl_kP = 1400.0;
+double xl_kI = 1.0;
+double xl_kD = 2.0;
+double xr_kP = 1500.0;
+double xr_kI = 1.0;
+double xr_kD = 3.0;
+double y_kP = 950.0;
 double y_kI = 2.0;
 double y_kD = 5.0;
-double theta_kP = 150.0;
+double theta_kP = 0.0;
 double theta_kI = 0.0;
 double theta_kD = 0.0;
 
@@ -104,6 +104,10 @@ double xl_prevError = 0.0;
 //Strafe wheel PID state
 double y_integral = 0.0;
 double y_prevError = 0.0;
+
+//Theta PID State
+double theta_integral = 0.0;
+double theta_prevError = 0.0;
 
 // Time tracking
 units::second_t m_prevTime = 0_s;
