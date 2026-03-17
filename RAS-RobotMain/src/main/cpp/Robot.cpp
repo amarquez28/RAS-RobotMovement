@@ -430,9 +430,7 @@ void Robot::TeleopInit() {
     std::cout << "[Teleop] TeleopInit — drive motors stopped\n";
 }
 
-void Robot::TeleopPeriodic() {
-.
-}
+void Robot::TeleopPeriodic() {}
 
 // ============================================================================
 //  Remaining mode stubs
