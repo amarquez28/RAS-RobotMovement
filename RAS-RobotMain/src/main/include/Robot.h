@@ -42,10 +42,6 @@ class Robot : public frc::TimesliceRobot {
   void DriveHorizontal(int8_t speed);
   void StopAllDrive();
 
-  // ── intake helpers ──────────────────────────────────────────────────────
-  void StartIntake();
-  void StopIntake();
-
  private:
   // ── SmartDashboard / auto chooser ───────────────────────────────────────
   frc::SendableChooser<std::string> m_chooser;

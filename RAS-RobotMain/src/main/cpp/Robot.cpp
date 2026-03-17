@@ -203,20 +203,6 @@ void Robot::StopAllDrive() {
 }
 
 // ============================================================================
-//  Intake helpers
-//  The Core Hex Motor is on RoboClaw 0x81 M2.
-//  Forward = intaking direction.
-// ============================================================================
-static constexpr uint8_t kIntakeSpeed = 80;
-
-void Robot::StartIntake() {
-    RoboClawM2Forward(kRoboClawAddr_Strafe, kIntakeSpeed);
-}
-void Robot::StopIntake() {
-    RoboClawM2Forward(kRoboClawAddr_Strafe, 0);
-}
-
-// ============================================================================
 //  IMU (MPU-6050) helpers
 // ============================================================================
 
@@ -308,6 +294,8 @@ void Robot::UpdateEncoders() {
 // ============================================================================
 
 void Robot::RobotPeriodic() {
+    m_aprilTagReader.UpdateDashboard();
+
     // Integrate IMU every tick for consistent dt
     IMUUpdate();
 
@@ -359,7 +347,7 @@ void Robot::AutonomousInit() {
     // Close hatch door
     m_servo0.SetPulseWidth(kHallServoInitPos);
 
-    // Safety stop
+    // Safety stop all drive motors
     RoboClawStopAll();
 
     std::cout << "[Auto] AutonomousInit complete\n";
@@ -372,7 +360,6 @@ void Robot::AutonomousInit() {
 void Robot::AutonomousPeriodic() {
     // ── 1. Update sensors ─────────────────────────────────────────────────
     UpdateEncoders();
-    m_aprilTagReader.UpdateDashboard();
 
     // Read the most recent AprilTag (if any)
     std::optional<AprilTagData> tag = std::nullopt;
@@ -386,7 +373,7 @@ void Robot::AutonomousPeriodic() {
     bool visionConnected = m_aprilTagReader.IsConnected();
     frc::SmartDashboard::PutBoolean("Vision/PiConnected", visionConnected);
     if (visionConnected) {
-        std::cout << "[Auto] Vision system connected\n";
+        std::cout << "Vision system connected\n";
     }
 
     // ── 3. Start sweep on first periodic tick ─────────────────────────────
@@ -395,7 +382,6 @@ void Robot::AutonomousPeriodic() {
     if (!m_sweepStarted && m_encodersValid) {
         m_sweep.Start(m_vertTicks, m_horizTicks, m_yaw_deg);
         m_sweepStarted = true;
-        StartIntake(); // Intake runs for the entire sweep
         std::cout << "[Auto] Sweep started\n";
     }
 
@@ -413,17 +399,9 @@ void Robot::AutonomousPeriodic() {
     DriveVertical  (cmd.vertical);
     DriveHorizontal(cmd.horizontal);
 
-    // Intake on/off based on sweep state
-    if (cmd.intakeOn) {
-        StartIntake();
-    } else {
-        StopIntake();
-    }
-
     // ── 6. Handle sweep completion ────────────────────────────────────────
     if (cmd.done) {
         StopAllDrive();
-        StopIntake();
 
         // If we spotted a tag during the sweep, report it
         if (m_sweep.TagWasSeen()) {
@@ -448,15 +426,12 @@ void Robot::AutonomousPeriodic() {
 // ============================================================================
 
 void Robot::TeleopInit() {
-    // Safety: stop all motors when teleop starts
     StopAllDrive();
-    StopIntake();
-    std::cout << "[Teleop] TeleopInit — all motors stopped\n";
+    std::cout << "[Teleop] TeleopInit — drive motors stopped\n";
 }
 
 void Robot::TeleopPeriodic() {
-    // TODO: add joystick / gamepad control here when hardware is ready.
-    // For now, this is intentionally a safe no-op to prevent runaway motors.
+.
 }
 
 // ============================================================================
@@ -465,7 +440,6 @@ void Robot::TeleopPeriodic() {
 
 void Robot::DisabledInit() {
     StopAllDrive();
-    StopIntake();
 }
 
 void Robot::DisabledPeriodic() {}
