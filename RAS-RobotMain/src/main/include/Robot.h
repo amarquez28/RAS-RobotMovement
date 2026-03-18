@@ -61,10 +61,11 @@ class Robot : public frc::TimesliceRobot {
   bool RoboClawReadEncoder(uint8_t addr, uint8_t cmd, int32_t& count, uint8_t& status);
   bool RoboClawReadEncoderM1(uint8_t addr, int32_t& count, uint8_t& status);
   bool RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status);
-
   //Encoder reset
   void RoboClawResetEncoder(uint8_t addr);
   void RoboClawResetAllEncoders();
+  //Wrap Angle for Theta controller
+  double WrapAngle(double angle);
 
   //hall sensor inputs
   frc::AnalogInput m_hallAnalog{0};   // AI0
@@ -80,32 +81,22 @@ class Robot : public frc::TimesliceRobot {
 
   //PID Tuning
   // Gains
-  double xl_kP = 800.0;
-  double xl_kI = 5.0;
-  double xl_kD = 0.4;
-  double xr_kP = 700.0;
-  double xr_kI = 5.0;
-  double xr_kD = 0.4;
-  double y_kP = 400.0;
+  double x_kP = 400.0;
+  double x_kI = 5.0;
+  double x_kD = 0.0;
+  double y_kP = 200.0;
   double y_kI = 5.0;
-  double y_kD = 1.2;
+  double y_kD = 2.0;
   double theta_kP = 0.0;
   double theta_kI = 0.0;
   double theta_kD = 0.0;
-
-  // Right wheel PID state
-  double xr_integral = 0.0;
-  double xr_prevError = 0.0;
-
-  // Left wheel PID state
-  double xl_integral = 0.0;
-  double xl_prevError = 0.0;
-
+  //Forward/Backward wheel PID state
+  double x_integral = 0.0;
+  double x_prevError = 0.0;
   //Strafe wheel PID state
   double y_integral = 0.0;
   double y_prevError = 0.0;
-
-  //Theta PID State
+  //Theta (IMU) PID State
   double theta_integral = 0.0;
   double theta_prevError = 0.0;
 

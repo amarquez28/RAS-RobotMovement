@@ -42,15 +42,6 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   // m_chooser.AddOption(kAutoNameCustom, kAutoNameCustom);
   frc::SmartDashboard::PutData("Auto Modes", &m_chooser);
 
-  //distance per pulse
-  //must be calculted for specific robot
-  //formula (wheel circumfrence (M))/ (Encoder pulses per revolution)
-  // Example: 6 inch wheel (0.1524m dia) -> Circumference = 0.478m
-  // Our encoder resolution is 751.88
-  // Our circumfrence is 0.226195
-  // If encoder has 360 ticks per rev: 0.478 / 360 = 0.00132
-  //m_encoder.SetDistancePerPulse(0.0003008392); // Replace with our calculated value
-
   m_servo0.SetPowered(true);
   m_servo1.SetPowered(true);
   m_servo2.SetPowered(true);
@@ -83,8 +74,8 @@ uint16_t Robot::RoboClawCRC16(const uint8_t* data, int len) {
   return crc;
 }
 
-  //Clean buffer, read and discard any pending bytes
- void Robot::RoboClawDrain(){
+//Clean buffer, read and discard any pending bytes
+void Robot::RoboClawDrain(){
   while (m_roboclaw.GetBytesReceived() > 0) {
     char junk [64];
     int n = std::min<int>(sizeof(junk), m_roboclaw.GetBytesReceived());
@@ -262,6 +253,16 @@ static int16_t ToInt16(uint8_t hi, uint8_t lo) {
   return static_cast<int16_t>((hi << 8) | lo);
 }
 
+double Robot::WrapAngle(double angle) {
+  while (angle > std::numbers::pi) {
+    angle -= 2.0 * std::numbers::pi;
+  }
+  while (angle < -std::numbers::pi) {
+    angle += 2.0 * std::numbers::pi;
+  }
+  return angle;
+}
+
 void Robot::AutonomousInit() {
   m_timer.Reset();
   m_timer.Start();
@@ -380,38 +381,48 @@ void Robot::AutonomousPeriodic() {
   double xl_m_position = e80_m2 * x_mperpul;
   double y_m_position = e81_m1 * y_mperpul;
 
+  //Pose estimation
+  double x_m_position = (xr_m_position + xl_m_position) / 2.0;
+  //IMU estimation (get Yaw in radians not degrees)
+  double theta_position; //IMU data will load this variable
+
   // Setpoints
-  double x_target_meters = 0.65;
-  double y_target_meters = 0.65;
+  double x_target_meters = 0.5;
+  double y_target_meters = 0.0;
+  double theta_target_rads = 0.0;
 
   //Errors
-  double xr_error_meters = x_target_meters - xr_m_position;
-  double xl_error_meters = x_target_meters - xl_m_position;
+  double x_error_meters = x_target_meters - x_m_position;
   double y_error_meters = y_target_meters - y_m_position;
+  double theta_error = WrapAngle(theta_target_rads - theta_position);
 
   // Integral
-  xr_integral += xr_error_meters * dt;
-  xl_integral += xl_error_meters * dt;
+  x_integral += x_error_meters * dt;
   y_integral += y_error_meters * dt;
+  theta_integral += theta_error * dt;
   // Anti-windup clamp
-  xr_integral = std::clamp(xr_integral, -10.0, 10.0);
-  xl_integral = std::clamp(xl_integral, -10.0, 10.0);
+  x_integral = std::clamp(x_integral, -10.0, 10.0);
   y_integral = std::clamp(y_integral, -10.0, 10.0);
+  theta_integral = std::clamp(theta_integral, -10.0, 10.0);
 
   // Derivative
-  double xr_derivative = (xr_error_meters - xr_prevError) / dt;
-  double xl_derivative = (xl_error_meters - xl_prevError) / dt;
+  double x_derivative = (x_error_meters - x_prevError) / dt;
   double y_derivative = (y_error_meters - y_prevError) / dt;
+  double theta_derivative = (theta_error - theta_prevError) / dt;
 
   // PID controller
-  double xr_controller = xr_kP * xr_error_meters + xr_kI * xr_integral + xr_kD * xr_derivative;
-  double xl_controller = xl_kP * xl_error_meters + xl_kI * xl_integral + xl_kD * xl_derivative;
+  double x_controller = x_kP * x_error_meters + x_kI * x_integral + x_kD * x_derivative;
   double y_controller = y_kP * y_error_meters + y_kI * y_integral + y_kD * y_derivative;
+  double theta_controller = theta_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_derivative;
 
   // Save error for next loop
-  xr_prevError = xr_error_meters;
-  xl_prevError = xl_error_meters;
+  x_prevError = x_error_meters;
   y_prevError = y_error_meters;
+  theta_prevError = theta_error;
+
+  //Motor Mixing
+  double xr_controller = x_controller + theta_controller;
+  double xl_controller = x_controller - theta_controller;
 
   // Saturation
   xr_controller = std::clamp(xr_controller, -127.0, 127.0);
@@ -464,17 +475,25 @@ void Robot::AutonomousPeriodic() {
     RoboClawM1Forward(kRoboClawAddr2, 0);
   }
 
-  frc::SmartDashboard::PutNumber("X Target", x_target_meters);
-  frc::SmartDashboard::PutNumber("Y Target", y_target_meters);
-  frc::SmartDashboard::PutNumber("XR Pos m", xr_m_position);
-  frc::SmartDashboard::PutNumber("XL Pos m", xl_m_position);
-  frc::SmartDashboard::PutNumber("Y Pos m", y_m_position);
-  frc::SmartDashboard::PutNumber("XR Error m", xr_error_meters);
-  frc::SmartDashboard::PutNumber("XL Error m", xl_error_meters);
-  frc::SmartDashboard::PutNumber("Y Error m", y_error_meters);
-  frc::SmartDashboard::PutNumber("XR Ctrl", xr_controller);
-  frc::SmartDashboard::PutNumber("XL Ctrl", xl_controller);
-  frc::SmartDashboard::PutNumber("Y Ctrl", y_controller);
+  frc::SmartDashboard::PutNumber("X Target M", dt);
+  frc::SmartDashboard::PutNumber("Y Target M", dt);
+  frc::SmartDashboard::PutNumber("Theta Target Rad", dt);
+  frc::SmartDashboard::PutNumber("XR Position (m)", xr_m_position);
+  frc::SmartDashboard::PutNumber("XL Position (m)", xl_m_position);
+  frc::SmartDashboard::PutNumber("Y Position (m)", y_m_position);
+  frc::SmartDashboard::PutNumber("X Position (m)", x_m_position);
+  frc::SmartDashboard::PutNumber("Theta Position (rad)", theta_position);
+  frc::SmartDashboard::PutNumber("Theta Position (deg)", theta_position * 180.0 / std::numbers::pi);
+  frc::SmartDashboard::PutNumber("X Error", x_error_meters);
+  frc::SmartDashboard::PutNumber("Y Error", y_error_meters);
+  frc::SmartDashboard::PutNumber("Theta Error", theta_error);
+  frc::SmartDashboard::PutNumber("X Cmd", x_controller);
+  frc::SmartDashboard::PutNumber("Y Cmd", y_controller);
+  frc::SmartDashboard::PutNumber("Theta Cmd", theta_controller);
+  frc::SmartDashboard::PutNumber("XR Mixed Cmd", xr_controller);
+  frc::SmartDashboard::PutNumber("XL Mixed Cmd", xl_controller);
+  frc::SmartDashboard::PutNumber("Y Final Cmd", y_controller);
+
   
   if(m_aprilTagReader.IsConnected()){
     std::cout << "Vision system is connected \n";
