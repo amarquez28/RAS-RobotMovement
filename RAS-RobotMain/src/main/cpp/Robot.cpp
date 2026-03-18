@@ -31,6 +31,7 @@
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+#include <numbers>
 
 // ── Constructor ──────────────────────────────────────────────────────────────
 
@@ -210,6 +211,19 @@ bool Robot::IMUWriteReg(uint8_t reg, uint8_t data) {
     uint8_t buf[2] = {reg, data};
     return m_imu.WriteBulk(buf, 2); // false = success in WPILib I2C
 }
+bool Robot::RoboClawReadEncoder(uint8_t addr, uint8_t cmd, int32_t& count, uint8_t& status) {
+  RoboClawDrain();
+
+  // Send request: [Addr, cmd, CRC16]
+  uint8_t req[2] = {addr, cmd};
+  uint16_t reqCrc = RoboClawCRC16(req, 2);
+
+  uint8_t out[4] = {
+    addr,
+    cmd,
+    static_cast<uint8_t>((reqCrc >> 8) & 0xFF),
+    static_cast<uint8_t>(reqCrc & 0xFF)
+  };
 
 bool Robot::IMUReadRegs(uint8_t startReg, uint8_t* out, int len) {
     if (m_imu.WriteBulk(&startReg, 1)) return true; // error
@@ -228,6 +242,13 @@ void Robot::IMUInit() {
 void Robot::IMUUpdate() {
     uint8_t data[14] = {0};
     if (IMUReadRegs(0x3B, data, 14)) return; // read error → skip
+  // Parse encoder count (big-endian), then reinterpret as signed
+  uint32_t raw = (uint32_t(resp[0]) << 24) |
+                 (uint32_t(resp[1]) << 16) |
+                 (uint32_t(resp[2]) << 8)  |
+                 (uint32_t(resp[3]) << 0);
+
+  count = static_cast<int32_t>(raw);
 
     // Gyro Z is bytes [12, 13] in the 14-byte burst starting at 0x3B
     int16_t gz_raw = static_cast<int16_t>((data[12] << 8) | data[13]);
@@ -236,6 +257,8 @@ void Robot::IMUUpdate() {
     auto now = frc::Timer::GetFPGATimestamp();
     double dt = (now - m_lastIMUTime).value(); // seconds
     m_lastIMUTime = now;
+  // Verify response CRC
+  uint16_t rxCrc = (uint16_t(resp[5]) << 8) | uint16_t(resp[6]);
 
     // Clamp dt to avoid huge integration jumps on first call or stalls
     if (dt > 0.05) dt = 0.05;
@@ -271,6 +294,13 @@ void Robot::IMUDashboard() {
 // ============================================================================
 //  Encoder odometry update
 // ============================================================================
+bool Robot::RoboClawReadEncoderM1(uint8_t addr, int32_t& count, uint8_t& status) {
+  return RoboClawReadEncoder(addr, 16, count, status);
+}
+
+bool Robot::RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status) {
+  return RoboClawReadEncoder(addr, 17, count, status);
+}
 
 void Robot::UpdateEncoders() {
     uint8_t  s1, s2;
@@ -295,6 +325,20 @@ void Robot::UpdateEncoders() {
 
 void Robot::RobotPeriodic() {
     m_aprilTagReader.UpdateDashboard();
+  //Magnetic orbs hatch door function
+  if (m_hallDigital.Get() == false) {
+    m_servo0.SetPulseWidth(HallServoOpenPos);
+  }
+  else {
+    m_servo0.SetPulseWidth(HallServoInitPos);
+  } 
+  frc::SmartDashboard::PutNumber("Current servo 0 location", m_servo0.GetPulseWidth());
+  //hall sensor dashboard values
+  frc::SmartDashboard::PutNumber("Hall Voltage (V)", m_hallAnalog.GetVoltage());
+  frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
+  frc::SmartDashboard::PutBoolean("Hall Digital (DIO8)", m_hallDigital.Get());
+  
+}
 
     // Integrate IMU every tick for consistent dt
     IMUUpdate();
@@ -321,8 +365,9 @@ void Robot::RobotPeriodic() {
 // ============================================================================
 
 void Robot::AutonomousInit() {
-    m_timer.Reset();
-    m_timer.Start();
+  m_timer.Reset();
+  m_timer.Start();
+  RoboClawDrain();
 
     // Reset heading integrator at the start of every auto run
     m_yaw_deg       = 0.0;
@@ -418,6 +463,93 @@ void Robot::AutonomousPeriodic() {
     frc::SmartDashboard::PutNumber("Auto/Yaw_deg",       m_yaw_deg);
     frc::SmartDashboard::PutNumber("Auto/VertTicks",     m_vertTicks);
     frc::SmartDashboard::PutNumber("Auto/HorizTicks",    m_horizTicks);
+  m_aprilTagReader.UpdateDashboard();
+
+  //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
+  int32_t e80_m1, e80_m2, e81_m1;
+  uint8_t s80_m1, s80_m2, s81_m1;
+
+  bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr1, e80_m1, s80_m1);
+  bool ok80_2 = RoboClawReadEncoderM2(kRoboClawAddr1, e80_m2, s80_m2);
+  bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr2, e81_m1, s81_m1);
+
+  frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok80_1);
+  frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok80_2);
+  frc::SmartDashboard::PutBoolean("RC2 Encoder1 OK", ok81_1);
+
+  if (ok80_1) frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e80_m1);
+  if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
+  if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1); 
+ 
+  // Encoder unit conversions
+  double wd = 0.072;
+  double wcirc = std::numbers::pi * wd;
+  double mperpul = wcirc / 758.0;
+
+  // PID build up
+  double xr_m_position = e80_m1 * mperpul;
+  double xl_m_position = e80_m2 * mperpul;
+
+  // Setpoints and errors
+  double x_target_meters = 10.0;
+  double xr_error_meters = x_target_meters - xr_m_position;
+  double xl_error_meters = x_target_meters - xl_m_position;
+
+  // P controller
+  double kP = 100.0;
+  double xr_controller = kP * xr_error_meters;
+  double xl_controller = kP * xl_error_meters;
+
+  // Saturation
+  if (xr_controller > 127.0) xr_controller = 127.0;
+  if (xr_controller < -127.0) xr_controller = -127.0;
+  if (xl_controller > 127.0) xl_controller = 127.0;
+  if (xl_controller < -127.0) xl_controller = -127.0;
+
+  // Tolerance
+  double tolerance = 0.05;
+  if (std::abs(xr_error_meters) <= tolerance) xr_controller = 0.0;
+  if (std::abs(xl_error_meters) <= tolerance) xl_controller = 0.0;
+
+  // Minimum command only outside tolerance
+  if (xr_controller > 0.0 && xr_controller < 25.0) xr_controller = 25.0;
+  if (xr_controller < 0.0 && xr_controller > -25.0) xr_controller = -25.0;
+
+  if (xl_controller > 0.0 && xl_controller < 25.0) xl_controller = 25.0;
+  if (xl_controller < 0.0 && xl_controller > -25.0) xl_controller = -25.0;
+
+  // Command magnitudes
+  double spdr = std::abs(xr_controller);
+  double spdl = std::abs(xl_controller);
+
+  // Command motors separately
+  if (xr_controller > 0.0) {
+    RoboClawM1Forward(kRoboClawAddr1, spdr);
+  } else if (xr_controller < 0.0) {
+    RoboClawM1Backward(kRoboClawAddr1, spdr);
+  } else {
+    RoboClawM1Forward(kRoboClawAddr1, 0);
+  }
+
+  if (xl_controller > 0.0) {
+    RoboClawM2Forward(kRoboClawAddr1, spdl);
+  } else if (xl_controller < 0.0) {
+    RoboClawM2Backward(kRoboClawAddr1, spdl);
+  } else {
+    RoboClawM2Forward(kRoboClawAddr1, 0);
+  }
+
+  frc::SmartDashboard::PutNumber("X Target", x_target_meters);
+  frc::SmartDashboard::PutNumber("XR Pos m", xr_m_position);
+  frc::SmartDashboard::PutNumber("XL Pos m", xl_m_position);
+  frc::SmartDashboard::PutNumber("XR Error m", xr_error_meters);
+  frc::SmartDashboard::PutNumber("XL Error m", xl_error_meters);
+  frc::SmartDashboard::PutNumber("XR Ctrl", xr_controller);
+  frc::SmartDashboard::PutNumber("XL Ctrl", xl_controller);
+  
+  if(m_aprilTagReader.IsConnected()){
+    std::cout << "Vision system is connected \n";
+  }
 }
 
 // ============================================================================
@@ -438,6 +570,8 @@ void Robot::TeleopPeriodic() {}
 
 void Robot::DisabledInit() {
     StopAllDrive();
+void Robot::DisabledInit() {
+  RoboClawDrain();
 }
 
 void Robot::DisabledPeriodic() {}

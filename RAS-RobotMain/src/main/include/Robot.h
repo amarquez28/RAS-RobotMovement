@@ -68,14 +68,12 @@ class Robot : public frc::TimesliceRobot {
   void RoboClawM1Backward(uint8_t addr, uint8_t speed);
   void RoboClawM2Forward (uint8_t addr, uint8_t speed);
   void RoboClawM2Backward(uint8_t addr, uint8_t speed);
-  void RoboClawStop      (uint8_t addr);
-  void RoboClawStopAll   ();
-
-  // Encoder reads
-  bool RoboClawReadEncoder  (uint8_t addr, uint8_t cmd,
-                              uint32_t& count, uint8_t& status);
-  bool RoboClawReadEncoderM1(uint8_t addr, uint32_t& count, uint8_t& status);
-  bool RoboClawReadEncoderM2(uint8_t addr, uint32_t& count, uint8_t& status);
+  void RoboClawStop(uint8_t addr);
+  void RoboClawStopAll();
+  //Encoder data commands
+  bool RoboClawReadEncoder(uint8_t addr, uint8_t cmd, int32_t& count, uint8_t& status);
+  bool RoboClawReadEncoderM1(uint8_t addr, int32_t& count, uint8_t& status);
+  bool RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status);
 
   // ── Hall sensor ─────────────────────────────────────────────────────────
   frc::AnalogInput m_hallAnalog{0};   // AI0
