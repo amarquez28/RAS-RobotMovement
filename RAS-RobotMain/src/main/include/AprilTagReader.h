@@ -8,6 +8,7 @@
 #include <networktables/BooleanTopic.h>
 #include <networktables/DoubleArrayTopic.h>
 #include <networktables/IntegerArrayTopic.h>
+#include <networktables/BooleanTopic.h>
 #include <vector>
 #include <optional>
 

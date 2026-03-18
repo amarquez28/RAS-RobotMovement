@@ -127,4 +127,6 @@ class Robot : public frc::TimesliceRobot {
   // ── Sweep state machine ─────────────────────────────────────────────────
   SweepController m_sweep;
   bool            m_sweepStarted = false;
+
+  nt::BooleanPublisher m_sweepDonePub;
 };

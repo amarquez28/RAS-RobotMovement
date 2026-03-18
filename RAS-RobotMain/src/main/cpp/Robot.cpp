@@ -56,6 +56,11 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
     // Clean RoboClaw buffers and stop all motors on boot
     m_roboclaw.Reset();
     RoboClawStopAll();
+
+    auto inst = nt::NetworkTableInstance::GetDefault();
+    auto table = inst.GetTable("Vision");
+    m_sweepDonePub = table->GetBooleanTopic("sweep_done").Publish();
+    m_sweepDonePub.Set(false);
 }
 
 // ============================================================================
@@ -405,6 +410,7 @@ void Robot::AutonomousPeriodic() {
     // ── 6. Handle sweep completion ────────────────────────────────────────
     if (cmd.done) {
         StopAllDrive();
+        m_sweepDonePub.Set(true);
 
         // If we spotted a tag during the sweep, report it
         if (m_sweep.TagWasSeen()) {
