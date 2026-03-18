@@ -70,14 +70,15 @@ class Robot : public frc::TimesliceRobot {
   void RoboClawM2Backward(uint8_t addr, uint8_t speed);
   void RoboClawStop(uint8_t addr);
   void RoboClawStopAll();
-  //Encoder data commands
-  bool RoboClawReadEncoder(uint8_t addr, uint8_t cmd, int32_t& count, uint8_t& status);
+
+  // Encoder read commands – all counts are signed int32
+  bool RoboClawReadEncoder  (uint8_t addr, uint8_t cmd, int32_t& count, uint8_t& status);
   bool RoboClawReadEncoderM1(uint8_t addr, int32_t& count, uint8_t& status);
   bool RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status);
 
   // ── Hall sensor ─────────────────────────────────────────────────────────
-  frc::AnalogInput m_hallAnalog{0};   // AI0
-  frc::DigitalInput m_hallDigital{9}; // DIO 9
+  frc::AnalogInput  m_hallAnalog{0};   // AI0
+  frc::DigitalInput m_hallDigital{9};  // DIO 9
 
   // ── REV ServoHub ────────────────────────────────────────────────────────
   static constexpr int kServoHubId = 20;
@@ -92,43 +93,33 @@ class Robot : public frc::TimesliceRobot {
   rev::servohub::ServoChannel& m_servo3{
       m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId3)};
 
-  // Servo pulse widths
+  // Servo pulse widths (microseconds)
   static constexpr int kHallServoInitPos = 500;   // Closed
   static constexpr int kHallServoOpenPos = 1500;  // Open
 
   // ── IMU (MPU-6050 on I²C onboard port, addr 0x68) ──────────────────────
   frc::I2C m_imu{frc::I2C::Port::kOnboard, 0x68};
 
-  bool  IMUWriteReg   (uint8_t reg, uint8_t data);
-  bool  IMUReadRegs   (uint8_t startReg, uint8_t* out, int len);
-  void  IMUInit       ();
-  void  IMUUpdate     ();          // Integrates gyro Z → m_yaw_deg
-  void  IMUDashboard  ();          // Pushes raw + converted values
+  bool  IMUWriteReg (uint8_t reg, uint8_t data);
+  bool  IMUReadRegs (uint8_t startReg, uint8_t* out, int len);
+  void  IMUInit     ();
+  void  IMUUpdate   ();   // Integrates gyro Z → m_yaw_deg
+  void  IMUDashboard();   // Pushes raw + converted values to SmartDashboard
 
-  // Integrated yaw (degrees).  Positive = counter-clockwise when viewed from top.
-  double m_yaw_deg         = 0.0;
-  double m_lastGyroZ_dps   = 0.0;
+  // Integrated yaw (degrees). Positive = counter-clockwise when viewed from top.
+  double          m_yaw_deg       = 0.0;
+  double          m_lastGyroZ_dps = 0.0;
   units::second_t m_lastIMUTime{0};
 
   // ── Encoder snapshot used by sweep ─────────────────────────────────────
-  // We use RoboClaw 0x80 M1 (left drive) as the vertical odometer
-  // and RoboClaw 0x81 M1 (strafe motor) as the horizontal odometer.
-  int32_t m_vertTicks  = 0;   // signed: positive = forward
-  int32_t m_horizTicks = 0;   // signed: positive = right
+  // RoboClaw 0x80 M1 (left drive)  → vertical odometer
+  // RoboClaw 0x81 M1 (strafe motor) → horizontal odometer
+  // Both are signed: positive = forward / right respectively.
+  int32_t m_vertTicks    = 0;
+  int32_t m_horizTicks   = 0;
+  bool    m_encodersValid = false;
 
-  // Raw 32-bit unsigned reads from RoboClaw (encoder wraps at 0xFFFFFFFF)
-  uint32_t m_vertRaw  = 0;
-  uint32_t m_horizRaw = 0;
-  bool     m_encodersValid = false;
-
-  // Convert unsigned RoboClaw encoder value to a signed relative count.
-  // RoboClaw encoders start at 0x00000000 and wrap; treat the midpoint
-  // (0x80000000) as the sign boundary.
-  static int32_t ToSigned(uint32_t raw) {
-      return static_cast<int32_t>(raw);
-  }
-
-  void UpdateEncoders();   // reads both encoders every periodic tick
+  void UpdateEncoders();   // Reads both odometry encoders every periodic tick
 
   // ── Vision / AprilTag ───────────────────────────────────────────────────
   AprilTagReader m_aprilTagReader;
