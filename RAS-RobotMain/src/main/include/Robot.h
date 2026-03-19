@@ -66,6 +66,9 @@ class Robot : public frc::TimesliceRobot {
   void RoboClawResetAllEncoders();
   //Wrap Angle for Theta controller
   double WrapAngle(double angle);
+  //IMU Calibration before starting the program
+  void CalibrateGyroZBias();
+  void UpdateIMUTheta();
 
   //hall sensor inputs
   frc::AnalogInput m_hallAnalog{0};   // AI0
@@ -81,13 +84,13 @@ class Robot : public frc::TimesliceRobot {
 
   //PID Tuning
   // Gains
-  double x_kP = 400.0;
-  double x_kI = 5.0;
+  double x_kP = 250.0;
+  double x_kI = 0.0;
   double x_kD = 0.0;
   double y_kP = 200.0;
   double y_kI = 5.0;
   double y_kD = 2.0;
-  double theta_kP = 0.0;
+  double theta_kP = 100.0;
   double theta_kI = 0.0;
   double theta_kD = 0.0;
   //Forward/Backward wheel PID state
@@ -99,6 +102,8 @@ class Robot : public frc::TimesliceRobot {
   //Theta (IMU) PID State
   double theta_integral = 0.0;
   double theta_prevError = 0.0;
+  double m_thetaRad = 0.0;
+  double m_gyroZBiasRadps = 0.0;
 
   // Time tracking
   units::second_t m_prevTime = 0_s;

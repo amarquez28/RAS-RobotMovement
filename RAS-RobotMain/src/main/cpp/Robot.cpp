@@ -19,6 +19,8 @@ int pulse = 500;
 int dir = 1;
 int counter = 0;
 bool start = false;
+static void UpdateIMUDashboard();
+//double g_gyroZBiasRadps = 0.0;
 
 static void InitIMU();
 
@@ -219,18 +221,18 @@ void Robot::RoboClawStopAll(){
  */
 void Robot::RobotPeriodic() {
   //Magnetic orbs hatch door function
-  if (m_hallDigital.Get() == false) {
+  /*if (m_hallDigital.Get() == false) {
     m_servo0.SetPulseWidth(HallServoOpenPos);
   }
   else {
     m_servo0.SetPulseWidth(HallServoInitPos);
-  } 
+  } */
   frc::SmartDashboard::PutNumber("Current servo 0 location", m_servo0.GetPulseWidth());
   //hall sensor dashboard values
   frc::SmartDashboard::PutNumber("Hall Voltage (V)", m_hallAnalog.GetVoltage());
   frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
   frc::SmartDashboard::PutBoolean("Hall Digital (DIO8)", m_hallDigital.Get());
-  
+  UpdateIMUDashboard();
 }
 
 static frc::I2C imu{frc::I2C::Port::kOnboard, 0x68};
@@ -271,7 +273,7 @@ void Robot::AutonomousInit() {
   RoboClawResetAllEncoders();
 
   // Force known start position
-  m_servo0.SetPulseWidth(HallServoInitPos);
+ // m_servo0.SetPulseWidth(HallServoInitPos);
 }
 
 static void InitIMU() {
@@ -329,6 +331,10 @@ static void UpdateIMUDashboard() {
   double gy_dps = gy / 131.0;
   double gz_dps = gz / 131.0;
 
+  double gx_radps = gx_dps * std::numbers::pi / 180.0;
+  double gy_radps = gy_dps * std::numbers::pi / 180.0;
+  double gz_radps = gz_dps * std::numbers::pi / 180.0;
+
   frc::SmartDashboard::PutNumber("IMU_Accel g X", ax_g);
   frc::SmartDashboard::PutNumber("IMU_Accel g Y", ay_g);
   frc::SmartDashboard::PutNumber("IMU_Accel g Z", az_g);
@@ -336,8 +342,50 @@ static void UpdateIMUDashboard() {
   frc::SmartDashboard::PutNumber("IMU_Gyro dps X", gx_dps);
   frc::SmartDashboard::PutNumber("IMU_Gyro dps Y", gy_dps);
   frc::SmartDashboard::PutNumber("IMU_Gyro dps Z", gz_dps);
+
+  frc::SmartDashboard::PutNumber("IMU_Gyro radps X", gx_radps);
+  frc::SmartDashboard::PutNumber("IMU_Gyro radps Y", gy_radps);
+  frc::SmartDashboard::PutNumber("IMU_Gyro radps Z", gz_radps);
 }
 
+static bool ReadIMU(double& gz_radps_out) {
+  uint8_t data[14] = {0};
+  bool readErr = ReadRegs(0x3B, data, 14);
+  if (readErr) return false;
+
+  int16_t gz = ToInt16(data[12], data[13]);
+
+  double gz_dps = gz / 131.0;
+  double gz_radps = gz_dps * std::numbers::pi / 180.0;
+
+  gz_radps_out = gz_radps;
+  return true;
+}
+
+void Robot::CalibrateGyroZBias() {
+  constexpr int kSamples = 500;
+
+  double sum = 0.0;
+  int count = 0;
+
+  for (int i = 0; i < kSamples; i++) {
+    double gz_radps = 0.0;
+
+    if (ReadIMU(gz_radps)) {
+      sum += gz_radps;
+      count++;
+    }
+
+    frc::Wait(0.002_s);
+  }
+
+  if (count > 0) {
+    m_gyroZBiasRadps = sum / count;
+  }
+
+  frc::SmartDashboard::PutNumber(
+    "IMU_Calibrated_GyroZBias_radps", m_gyroZBiasRadps);
+}
 void Robot::AutonomousPeriodic() {
   m_aprilTagReader.UpdateDashboard();
 
@@ -352,7 +400,19 @@ void Robot::AutonomousPeriodic() {
   m_prevTime = now;
   if (dt <= 1e-4 || dt > 0.1) {
   dt = 0.02;  // fallback
-}
+  }
+
+  //IMU Values
+  double gz_radps;
+  bool ok = ReadIMU(gz_radps);
+  double omega_z = gz_radps - m_gyroZBiasRadps;
+  m_thetaRad += omega_z * dt;
+  m_thetaRad = WrapAngle(m_thetaRad);
+  frc::SmartDashboard::PutBoolean("IMU_Read OK", ok);
+  frc::SmartDashboard::PutNumber("IMU_GyroZ_radps", gz_radps);
+  frc::SmartDashboard::PutNumber("IMU_GyroZ_Bias_radps", m_gyroZBiasRadps);
+  frc::SmartDashboard::PutNumber("IMU_OmegaZ_radps", omega_z);
+  frc::SmartDashboard::PutNumber("IMU_Theta_rad", m_thetaRad);
 
   //Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
   int32_t e80_m1, e80_m2, e81_m1;
@@ -380,15 +440,14 @@ void Robot::AutonomousPeriodic() {
   double xr_m_position = e80_m1 * x_mperpul;
   double xl_m_position = e80_m2 * x_mperpul;
   double y_m_position = e81_m1 * y_mperpul;
-
   //Pose estimation
   double x_m_position = (xr_m_position + xl_m_position) / 2.0;
   //IMU estimation (get Yaw in radians not degrees)
-  double theta_position; //IMU data will load this variable
+  double theta_position = m_thetaRad; //IMU data will load this variable
 
   // Setpoints
-  double x_target_meters = 0.5;
-  double y_target_meters = 0.0;
+  double x_target_meters = 0.6;
+  double y_target_meters = 1.0;
   double theta_target_rads = 0.0;
 
   //Errors
@@ -475,9 +534,9 @@ void Robot::AutonomousPeriodic() {
     RoboClawM1Forward(kRoboClawAddr2, 0);
   }
 
-  frc::SmartDashboard::PutNumber("X Target M", dt);
-  frc::SmartDashboard::PutNumber("Y Target M", dt);
-  frc::SmartDashboard::PutNumber("Theta Target Rad", dt);
+  frc::SmartDashboard::PutNumber("X Target M", x_target_meters);
+  frc::SmartDashboard::PutNumber("Y Target M", y_target_meters);
+  frc::SmartDashboard::PutNumber("Theta Target Rad", theta_target_rads);
   frc::SmartDashboard::PutNumber("XR Position (m)", xr_m_position);
   frc::SmartDashboard::PutNumber("XL Position (m)", xl_m_position);
   frc::SmartDashboard::PutNumber("Y Position (m)", y_m_position);
@@ -492,7 +551,6 @@ void Robot::AutonomousPeriodic() {
   frc::SmartDashboard::PutNumber("Theta Cmd", theta_controller);
   frc::SmartDashboard::PutNumber("XR Mixed Cmd", xr_controller);
   frc::SmartDashboard::PutNumber("XL Mixed Cmd", xl_controller);
-  frc::SmartDashboard::PutNumber("Y Final Cmd", y_controller);
 
   
   if(m_aprilTagReader.IsConnected()){
