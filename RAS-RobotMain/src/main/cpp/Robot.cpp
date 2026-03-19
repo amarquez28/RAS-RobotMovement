@@ -211,6 +211,72 @@ void Robot::StopAllDrive() {
 }
 
 // ============================================================================
+//  DriveTankSteered  –  differential steering during tag approach
+// ============================================================================
+//
+//  Because the wheels cannot strafe while moving, we steer by giving the two
+//  drive motors slightly different speeds (tank/differential drive).
+//
+//  Parameters:
+//    baseSpeed  : signed speed for both wheels before correction.
+//                 Will be NEGATIVE during tag approach (robot backs toward tag).
+//    pixelError : tag.x − kCameraCenter_px
+//                 Positive = tag is right of the camera's optical center.
+//                 Negative = tag is left.
+//
+//  Why the sign works out automatically for the rear-facing camera:
+//    When we drive backward (baseSpeed < 0):
+//      pixelError > 0  →  tag is right in the image
+//                      →  robot's rear end is drifting LEFT
+//                      →  we need to swing the rear RIGHT
+//                      →  slow the LEFT motor (M1), keep RIGHT (M2)
+//      The correction term is (base * normError).
+//      base = negative, normError = positive → correction is negative.
+//      leftSpeed  = base + (negative correction) → |leftSpeed| decreases ✓
+//      rightSpeed = base - (negative correction) → |rightSpeed| increases ✓
+//    The opposite holds when pixelError < 0. No explicit sign flip needed.
+//
+//  kSteerFactor (0.0–1.0): fraction of base speed applied as differential.
+//    0.3 means the inner wheel slows by 30% of base at maximum pixel error.
+//    Start low and tune up if the robot is not correcting fast enough.
+//
+void Robot::DriveTankSteered(int8_t baseSpeed, double pixelError){
+    // Normalise error  to [-1, 1] clamped at one tolerance width
+    double normError = pixelError / kCenterTolerance_px;
+    if(normError > 1.0) normError = 1.0;
+    if(normError < -1.0) normError = -1.0;
+
+    double base = static_cast<double>(baseSpeed);
+    double leftSpeed = base + base * normError * kSteerFactor;
+    double rightSpeed = base - base * normError * kSteerFactor;
+
+    //clamp to valid roboclaw range [-127, 127]
+    auto clamp127 = [](double v) -> int8_t{
+        if(v > 127.0) v = 127.0;
+        if(v < -127.0) v = -127.0;
+        return static_cast<int8_t>(v);
+    };
+    int8_t l = clamp127(leftSpeed);
+    int8_t r = clamp127(rightSpeed);
+
+    frc::SmartDashboard::PutNumber("Drive/LeftSpeed",  l);
+    frc::SmartDashboard::PutNumber("Drive/RightSpeed", r);
+
+    //M1 = left motor, M2 = right motor on roboclaw 0x80
+    if(l >= 0){
+        RoboClawM1Forward(kRoboClawAddr_Drive, static_cast<uint8_t>(l));
+    }
+    else{
+        RoboClawM1Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(-l));
+    }
+    if(r >= 0){
+        RoboClawM2Forward(kRoboClawAddr_Drive, static_cast<uint8_t>(r));
+    }
+    else{
+        RoboClawM2Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(-r));
+    }
+}
+// ============================================================================
 //  IMU (MPU-6050) helpers
 // ============================================================================
 
@@ -447,29 +513,28 @@ void Robot::AutonomousPeriodic() {
             break;
         }
         //still approaching - drive forward
-        DriveVertical(static_cast<int8_t>(kApproachSpeed));
+        DriveVertical(static_cast<int8_t>(-kApproachSpeed));
 
-        // Lateral centering: keep the tag in the middle of the camera frame.
-        // tag.x is the pixel column published by the Pi (0 = left, 1480 = right).
-        // We compute the signed pixel error and apply a proportional strafe.
+         // ── Differential steering toward tag ──────────────────────────────
+        //
+        // pixelError > 0: tag is RIGHT of camera centre
+        //   → robot rear is drifting LEFT relative to tag
+        //   → slow left motor to swing rear right
+        //
+        // pixelError < 0: tag is LEFT of camera centre
+        //   → robot rear is drifting RIGHT relative to tag
+        //   → slow right motor to swing rear left
+        //
+        // DriveTankSteered() takes care of the sign arithmetic. We pass
+        // -kApproachSpeed because the robot must drive BACKWARD to move
+        // the camera (rear-facing) toward the tag.
         {
-            double pixelError = tag.x = kCameraCenter_px;
-            int8_t strafe = 0;
-
-            if(pixelError > kCenterTolerance_px){
-                //tag is right of center -> strafe right to recenter
-                strafe = static_cast<int8_t>(kCenterSpeed);
-            }
-            else if(pixelError < -kCenterTolerance_px){
-                //tag is left of center -> strafe left to recenter
-                strafe = -static_cast<int8_t>(kCenterSpeed);
-            }
-            DriveHorizontal(strafe);
+            double pixelError = tag.x - kCameraCenter_px;
+            DriveTankSteered(-static_cast<int8_t>(kApproachSpeed),pixelError);
 
             frc::SmartDashboard::PutNumber("auto/tag_distance_m", tag.distance);
             frc::SmartDashboard::PutNumber("auto/tag_x_px", tag.x);
             frc::SmartDashboard::PutNumber("auto/tag_pixelError", pixelError);
-            frc::SmartDashboard::PutNumber("auto/strafe", strafe);
         }
 
         frc::SmartDashboard::PutString("Auto/Phase", "Approach");
