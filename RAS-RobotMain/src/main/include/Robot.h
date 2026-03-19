@@ -21,6 +21,16 @@
 #include "AprilTagReader.h"
 #include "SweepController.h"
 
+// ── Autonomous phase ─────────────────────────────────────────────────────────
+// SEARCH  : No tag visible yet – robot holds position and waits.
+// APPROACH: Tag detected – robot drives straight toward it until ≤ 0.5 m away.
+// DONE    : Within stopping distance – motors stopped, Pi notified.
+enum class AutoPhase{
+    SEARCH,
+    APPROACH,
+    DONE
+};
+
 class Robot : public frc::TimesliceRobot {
  public:
   Robot();
@@ -128,5 +138,32 @@ class Robot : public frc::TimesliceRobot {
   SweepController m_sweep;
   bool            m_sweepStarted = false;
 
+  // ── Tag-approach autonomous phase ───────────────────────────────────────
+  // The robot waits for a tag, then drives straight toward it until
+  
+  AutoPhase m_autoPhase = AutoPhase::SEARCH;
+  bool m_taskDone = false;
+
+  //stopping distance from the tag (meters)
+  static constexpr double kStopDistance_m = 0.5;
+
+  //forward drive speed while approaching (0-127)
+  static constexpr uint8_t kApproachSpeed = 45;
+
+  //lateral correction speed for centering on the tag (0-127)
+  //applied as a strafe blend when the tag is off-center in the camera frame
+  static constexpr uint8_t kCenterSpeed = 20;
+
+  // Camera principal-point X (pixels). Tag x > this → tag is right of center.
+  // Matches the value used in apriltag.py (cx = 740 for 1480-wide frame).
+  static constexpr double kCameraCenter_px = 740.0;
+ 
+  // How far off-center (pixels) before we apply a lateral correction.
+  static constexpr double kCenterTolerance_px = 40.0;
+ 
+  // ── NetworkTables publishers ─────────────────────────────────────────────
+  // Vision/task_done   → Pi reads this to know the robot has arrived.
+  // Vision/sweep_done  → Legacy sweep-completion signal (kept for compatibility).
+  nt::BooleanPublisher m_taskDonePub;
   nt::BooleanPublisher m_sweepDonePub;
 };

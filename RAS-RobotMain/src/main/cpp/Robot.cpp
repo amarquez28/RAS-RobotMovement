@@ -342,15 +342,19 @@ void Robot::AutonomousInit() {
     // Re-init IMU in case of power cycle
     IMUInit();
 
+    //reset approach state
+    m_autoPhase = AutoPhase::SEARCH;
+    m_taskDone = false;
+
+    //clear nt completion flags so the pi sees the reset
+    m_taskDonePub.Set(false);
+    m_sweepDonePub.Set(false);
+
     // Snapshot encoders BEFORE we start moving so the sweep gets
     // relative distances (not absolute counts from power-on)
     UpdateEncoders();
     m_vertTicks  = 0;
     m_horizTicks = 0;
-
-    // Prepare sweep state machine
-    m_sweep.Reset();
-    m_sweepStarted = false;
 
     // Close hatch door
     m_servo0.SetPulseWidth(kHallServoInitPos);
@@ -363,65 +367,120 @@ void Robot::AutonomousInit() {
 
 // ============================================================================
 //  AutonomousPeriodic
+//
+//  State machine:
+//
+//   SEARCH ──(tag detected)──► APPROACH ──(distance ≤ 0.5 m)──► DONE
+//
+//  In APPROACH, every tick:
+//    • DriveVertical(kApproachSpeed)  – move forward
+//    • Compute pixel error: tagX − kCameraCenter_px
+//        - If error > +kCenterTolerance_px → strafe right  (+kCenterSpeed)
+//        - If error < -kCenterTolerance_px → strafe left   (-kCenterSpeed)
+//        - Otherwise → strafe 0  (already centered)
+//
+//  If we lose the tag mid-approach (HasTarget() goes false), we stop and
+//  fall back to SEARCH so we don't blindly drive off course.
+//
 // ============================================================================
 
 void Robot::AutonomousPeriodic() {
-    // ── 1. Update sensors ─────────────────────────────────────────────────
+    // ── Update sensors ─────────────────────────────────────────────────
     UpdateEncoders();
 
-    // Read the most recent AprilTag (if any)
-    std::optional<AprilTagData> tag = std::nullopt;
-    if (m_aprilTagReader.HasTarget()) {
-        tag = m_aprilTagReader.GetPrimaryTag();
-    }
-
-    // ── 2. Log vision connection status ───────────────────────────────────
+    // ── Log vision connection status ───────────────────────────────────
     // NOTE: IsConnected() compares heartbeat values between calls.
     // Moved here (not inside a conditional after a return) so it always runs.
     bool visionConnected = m_aprilTagReader.IsConnected();
     frc::SmartDashboard::PutBoolean("Vision/PiConnected", visionConnected);
-    if (visionConnected) {
-        std::cout << "Vision system connected\n";
-    }
 
-    // ── 3. Start sweep on first periodic tick ─────────────────────────────
-    // The Pi enables the robot via the DS protocol, so by the time
-    // AutonomousPeriodic() runs we are already enabled.
-    if (!m_sweepStarted && m_encodersValid) {
-        m_sweep.Start(m_vertTicks, m_horizTicks, m_yaw_deg);
-        m_sweepStarted = true;
-        std::cout << "[Auto] Sweep started\n";
-    }
-
-    if (!m_sweepStarted) {
-        // Encoders not yet valid — stay stopped
+    // ── DONE: task already complete, just hold still ───────────────────────
+    if(m_taskDone){
         StopAllDrive();
         return;
     }
 
-    // ── 4. Run sweep state machine ────────────────────────────────────────
-    SweepController::DriveCommand cmd =
-        m_sweep.Update(m_vertTicks, m_horizTicks, m_yaw_deg, tag);
-
-    // ── 5. Execute drive command ──────────────────────────────────────────
-    DriveVertical  (cmd.vertical);
-    DriveHorizontal(cmd.horizontal);
-
-    // ── 6. Handle sweep completion ────────────────────────────────────────
-    if (cmd.done) {
-        StopAllDrive();
-        m_sweepDonePub.Set(true);
-
-        // If we spotted a tag during the sweep, report it
-        if (m_sweep.TagWasSeen()) {
-            std::cout << "[Auto] Sweep complete. AprilTag ID "
-                      << m_sweep.LastTagId()
-                      << " was detected during sweep.\n";
-        } else {
-            std::cout << "[Auto] Sweep complete. No AprilTags detected.\n";
+    // Read the most recent AprilTag (if any)
+    bool hasTag = m_aprilTagReader.HasTarget();
+    AprilTagData tag{};
+    if(hasTag){
+        tag = m_aprilTagReader.GetPrimaryTag();
+        // Reject stale / invalid pose readings (Pi publishes -1 when pose
+        // estimation fails even though tag_detected is still true)
+        if(tag.distance <= 0.0){
+            hasTag = false;
         }
     }
 
+    switch (m_autoPhase)
+    {
+    case AutoPhase::SEARCH:
+        StopAllDrive();
+
+        if(hasTag){
+            m_autoPhase = AutoPhase::APPROACH;
+            // Fall through intentionallly so we start driving this same tick rather than waiting one more 5 ms cycle
+            [[fallthrough]];
+        }
+        else{
+            frc::SmartDashboard::PutString("Auto/phase", "search");
+            break;
+        }
+    // ── APPROACH: drive toward the tag ────────────────────────────────────
+    case AutoPhase::APPROACH:
+        //safety: if we lost the tag, stop and go back to searching
+        if(!hasTag){
+            StopAllDrive();
+            m_autoPhase = AutoPhase::SEARCH;
+            break;
+        }
+        
+        //check stop condition so we dont overshoot
+        if(tag.distance <= kStopDistance_m){
+            StopAllDrive();
+            //notify sir pi we have arrived
+            m_taskDonePub.Set(true);
+            m_sweepDonePub.Set(true); //also set legacy key
+            m_taskDone = true;
+
+            m_autoPhase = AutoPhase::DONE;
+            break;
+        }
+        //still approaching - drive forward
+        DriveVertical(static_cast<int8_t>(kApproachSpeed));
+
+        // Lateral centering: keep the tag in the middle of the camera frame.
+        // tag.x is the pixel column published by the Pi (0 = left, 1480 = right).
+        // We compute the signed pixel error and apply a proportional strafe.
+        {
+            double pixelError = tag.x = kCameraCenter_px;
+            int8_t strafe = 0;
+
+            if(pixelError > kCenterTolerance_px){
+                //tag is right of center -> strafe right to recenter
+                strafe = static_cast<int8_t>(kCenterSpeed);
+            }
+            else if(pixelError < -kCenterTolerance_px){
+                //tag is left of center -> strafe left to recenter
+                strafe = -static_cast<int8_t>(kCenterSpeed);
+            }
+            DriveHorizontal(strafe);
+
+            frc::SmartDashboard::PutNumber("auto/tag_distance_m", tag.distance);
+            frc::SmartDashboard::PutNumber("auto/tag_x_px", tag.x);
+            frc::SmartDashboard::PutNumber("auto/tag_pixelError", pixelError);
+            frc::SmartDashboard::PutNumber("auto/strafe", strafe);
+        }
+
+        frc::SmartDashboard::PutString("Auto/Phase", "Approach");
+        break;
+
+    case AutoPhase::DONE:
+        StopAllDrive();
+        frc::SmartDashboard::PutString("auto/phase", "Done");
+        break;
+
+    }
     // ── 7. Dashboard summary ──────────────────────────────────────────────
     frc::SmartDashboard::PutNumber("Auto/ElapsedTime_s", m_timer.Get().value());
     frc::SmartDashboard::PutNumber("Auto/Yaw_deg",       m_yaw_deg);
