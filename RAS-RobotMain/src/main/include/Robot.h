@@ -19,6 +19,7 @@
 #include <frc/DigitalInput.h> //hall sensor test
 #include <frc/SerialPort.h> //UART communication with Roboclaw
 #include "AprilTagReader.h"
+#include <vector>
 
 class Robot : public frc::TimesliceRobot {
  public:
@@ -69,6 +70,10 @@ class Robot : public frc::TimesliceRobot {
   //IMU Calibration before starting the program
   void CalibrateGyroZBias();
   void UpdateIMUTheta();
+  //Setpoint Helpers
+  void LoadAutonomousSetpoints();
+  void AdvanceToNextSetpoint();
+  void ResetPidState();
 
   //hall sensor inputs
   frc::AnalogInput m_hallAnalog{0};   // AI0
@@ -81,15 +86,14 @@ class Robot : public frc::TimesliceRobot {
   rev::servohub::ServoChannel& m_servo1{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId1)};
   rev::servohub::ServoChannel& m_servo2{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};
   rev::servohub::ServoChannel& m_servo3{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId3)};
-
   //PID Tuning
   // Gains
-  double x_kP = 80.0;
-  double x_kI = 10.0;
+  double x_kP = 91.0;
+  double x_kI = 8.0;
   double x_kD = 5.0;
-  double y_kP = 90.0;
-  double y_kI = 10.0;
-  double y_kD = 2.0;
+  double y_kP = 160.0;
+  double y_kI = 0.0;
+  double y_kD = 0.5;
   double theta_kI = 5.0;
   double theta_kD = 0.5;
   //Forward/Backward wheel PID state
@@ -107,6 +111,17 @@ class Robot : public frc::TimesliceRobot {
   // Time tracking
   units::second_t m_prevTime = 0_s;
   bool m_firstPidLoop = true;
+
+  //Setpoint declaration
+  struct Setpoint {
+    double x_trgt;
+    double y_trgt;
+    double theta_rad_trgt;
+  };
+
+  std::vector<Setpoint> m_setpoints;
+  size_t m_currentSetpointIndex = 0;
+  bool m_autoComplete = false; 
 
   AprilTagReader m_aprilTagReader;
 };

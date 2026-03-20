@@ -264,6 +264,37 @@ double Robot::WrapAngle(double angle) {
   return angle;
 }
 
+void Robot::LoadAutonomousSetpoints() {
+  m_setpoints = {
+    {0.20, 0.0, 0.0},
+    {0.20, 0.0, std::numbers::pi / 2.0},
+    {0.40, 0.0, std::numbers::pi / 2.0}
+  };
+
+  m_currentSetpointIndex = 0;
+  m_autoComplete = m_setpoints.empty();
+}
+
+void Robot::AdvanceToNextSetpoint() {
+  ResetPidState();
+
+  if (m_currentSetpointIndex + 1 < m_setpoints.size()) {
+    m_currentSetpointIndex++;
+  } else {
+    m_autoComplete = true;
+  }
+}
+
+void Robot::ResetPidState() {
+  x_integral = 0.0;
+  y_integral = 0.0;
+  theta_integral = 0.0;
+
+  x_prevError = 0.0;
+  y_prevError = 0.0;
+  theta_prevError = 0.0;
+}
+
 void Robot::AutonomousInit() {
   m_timer.Reset();
   m_timer.Start();
@@ -272,7 +303,12 @@ void Robot::AutonomousInit() {
   RoboClawResetAllEncoders();
   CalibrateGyroZBias();
   // Force known start position
- // m_servo0.SetPulseWidth(HallServoInitPos);
+  // m_servo0.SetPulseWidth(HallServoInitPos);
+
+  ResetPidState();
+  LoadAutonomousSetpoints();
+  m_thetaRad = 0.0;
+  m_firstPidLoop = true;
 }
 
 static void InitIMU() {
@@ -362,7 +398,7 @@ static bool ReadIMU(double& gz_radps_out) {
 }
 
 void Robot::CalibrateGyroZBias() {
-  constexpr int kSamples = 1000;
+  constexpr int kSamples = 500;
 
   double sum = 0.0;
   int count = 0;
@@ -446,9 +482,17 @@ void Robot::AutonomousPeriodic() {
   double theta_position = m_thetaRad; //IMU data will load this variable
 
   // Setpoints
-  double x_target_meters = 0.3;
-  double y_target_meters = 0.0;
-  double theta_target_rads = 0.0;
+  if (m_autoComplete || m_setpoints.empty()) {
+    RoboClawStopAll();
+    frc::SmartDashboard::PutString("Auto Status", "Complete");
+    return;
+  }
+
+  const auto& target = m_setpoints[m_currentSetpointIndex];
+
+  double x_target_meters = target.x_trgt;
+  double y_target_meters = target.y_trgt;
+  double theta_target_rads = target.theta_rad_trgt;
 
   //Errors
   double x_error_meters = x_target_meters - x_m_position;
@@ -489,17 +533,32 @@ void Robot::AutonomousPeriodic() {
   theta_prevError = theta_error;
 
   // Tolerance
+  double x_tolerance = 0.005;
+  double y_tolerance = 0.005;
+  double theta_tolerance = 0.02;
+
   double tolerance = 0.005;
-  if (std::abs(x_error_meters) <= tolerance) {
+  if (std::abs(x_error_meters) <= x_tolerance) {
     x_controller = 0.0;
     x_integral = 0.0;
   }
-  if (std::abs(y_error_meters) <= tolerance) {
+  if (std::abs(y_error_meters) <= y_tolerance) {
     y_controller = 0.0;
     y_integral = 0.0; } 
-  if (std::abs(theta_error) <= 0.01) {
+  if (std::abs(theta_error) <= theta_tolerance) {
     theta_controller = 0.0;
     theta_integral = 0.0;
+  }
+
+  //At target logic
+  bool x_at_target = std::abs(x_error_meters) <= x_tolerance;
+  bool y_at_target = std::abs(y_error_meters) <= y_tolerance;
+  bool theta_at_target = std::abs(theta_error) <= theta_tolerance;
+
+  if (x_at_target && y_at_target && theta_at_target) {
+    AdvanceToNextSetpoint();
+    RoboClawStopAll();
+    return;
   }
 
   //Motor Mixing
