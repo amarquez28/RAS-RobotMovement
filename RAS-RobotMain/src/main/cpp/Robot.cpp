@@ -561,25 +561,30 @@ void Robot::AutonomousPeriodic() {
     return;
   }
 
-  //Motor Mixing
-  theta_controller = std::clamp(theta_controller, -80.0, 80.0);
-  double xr_controller = x_controller + theta_controller;
-  double xl_controller = x_controller - theta_controller;
-
   // Saturation
-  xr_controller = std::clamp(xr_controller, -127.0, 127.0);
-  xl_controller = std::clamp(xl_controller, -127.0, 127.0);
+  x_controller = std::clamp(x_controller, -127.0, 127.0);
   y_controller = std::clamp(y_controller, -127.0, 127.0);
+  theta_controller = std::clamp(theta_controller, -80.0, 80.0);
 
   // Minimum command only outside tolerance
   if (theta_controller > 0.0 && theta_controller < 25.0) theta_controller = 25.0;
   if (theta_controller < 0.0 && theta_controller > -25.0) theta_controller = -25.0;
+  if (y_controller > 0.0 && y_controller < 15.0) y_controller = 15.0;
+  if (y_controller < 0.0 && y_controller > -15.0) y_controller = -15.0;
+
+  //Motor Mixing
+  double xr_controller = x_controller + theta_controller;
+  double xl_controller = x_controller - theta_controller;
+
+  //Clamp mixed wheel commands
+  xr_controller = std::clamp(xr_controller, -127.0, 127.0);
+  xl_controller = std::clamp(xl_controller, -127.0, 127.0);
+
+  //Minimum tolerance for mixed motors
   if (xr_controller > 0.0 && xr_controller < 25.0) xr_controller = 25.0;
   if (xr_controller < 0.0 && xr_controller > -25.0) xr_controller = -25.0;
   if (xl_controller > 0.0 && xl_controller < 25.0) xl_controller = 25.0;
   if (xl_controller < 0.0 && xl_controller > -25.0) xl_controller = -25.0;
-  if (y_controller > 0.0 && y_controller < 15.0) y_controller = 15.0;
-  if (y_controller < 0.0 && y_controller > -15.0) y_controller = -15.0;
 
   // Command magnitudes
   double spdr = std::abs(xr_controller);
