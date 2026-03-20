@@ -26,8 +26,7 @@ static void InitIMU();
 
 // Run robot periodic() functions for 5 ms, and run controllers every 10 ms
 Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
-  // LiveWindow causes drastic overruns in robot periodic functions that will
-  // interfere with controllers
+  // LiveWindow causes drastic overruns in robot periodic functions that will interfere with controllers
   frc::LiveWindow::DisableAllTelemetry();
 
   // Runs for 2 ms after robot periodic functions
@@ -271,7 +270,7 @@ void Robot::AutonomousInit() {
   RoboClawStopAll();
   RoboClawDrain();
   RoboClawResetAllEncoders();
-
+  CalibrateGyroZBias();
   // Force known start position
  // m_servo0.SetPulseWidth(HallServoInitPos);
 }
@@ -363,7 +362,7 @@ static bool ReadIMU(double& gz_radps_out) {
 }
 
 void Robot::CalibrateGyroZBias() {
-  constexpr int kSamples = 500;
+  constexpr int kSamples = 1000;
 
   double sum = 0.0;
   int count = 0;
@@ -386,6 +385,7 @@ void Robot::CalibrateGyroZBias() {
   frc::SmartDashboard::PutNumber(
     "IMU_Calibrated_GyroZBias_radps", m_gyroZBiasRadps);
 }
+
 void Robot::AutonomousPeriodic() {
   m_aprilTagReader.UpdateDashboard();
 
@@ -446,8 +446,8 @@ void Robot::AutonomousPeriodic() {
   double theta_position = m_thetaRad; //IMU data will load this variable
 
   // Setpoints
-  double x_target_meters = 0.6;
-  double y_target_meters = 1.0;
+  double x_target_meters = 0.3;
+  double y_target_meters = 0.0;
   double theta_target_rads = 0.0;
 
   //Errors
@@ -468,18 +468,42 @@ void Robot::AutonomousPeriodic() {
   double x_derivative = (x_error_meters - x_prevError) / dt;
   double y_derivative = (y_error_meters - y_prevError) / dt;
   double theta_derivative = (theta_error - theta_prevError) / dt;
+  
+  //Gain Scheduling
+  double abs_theta_error = std::abs(theta_error);
+  double scheduled_theta_kP = 40.0;
+  if (abs_theta_error > std::numbers::pi / 4) {
+    scheduled_theta_kP = 60.0;
+  } else if (abs_theta_error > std::numbers::pi / 12) {
+    scheduled_theta_kP = 80.0;
+  }
 
   // PID controller
   double x_controller = x_kP * x_error_meters + x_kI * x_integral + x_kD * x_derivative;
   double y_controller = y_kP * y_error_meters + y_kI * y_integral + y_kD * y_derivative;
-  double theta_controller = theta_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_derivative;
-
+  double theta_controller = scheduled_theta_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_derivative;
+  
   // Save error for next loop
   x_prevError = x_error_meters;
   y_prevError = y_error_meters;
   theta_prevError = theta_error;
 
+  // Tolerance
+  double tolerance = 0.005;
+  if (std::abs(x_error_meters) <= tolerance) {
+    x_controller = 0.0;
+    x_integral = 0.0;
+  }
+  if (std::abs(y_error_meters) <= tolerance) {
+    y_controller = 0.0;
+    y_integral = 0.0; } 
+  if (std::abs(theta_error) <= 0.01) {
+    theta_controller = 0.0;
+    theta_integral = 0.0;
+  }
+
   //Motor Mixing
+  theta_controller = std::clamp(theta_controller, -80.0, 80.0);
   double xr_controller = x_controller + theta_controller;
   double xl_controller = x_controller - theta_controller;
 
@@ -488,22 +512,16 @@ void Robot::AutonomousPeriodic() {
   xl_controller = std::clamp(xl_controller, -127.0, 127.0);
   y_controller = std::clamp(y_controller, -127.0, 127.0);
 
-  // Tolerance
-  /*double tolerance = 0.01;
-  if (std::abs(xr_error_meters) <= tolerance) xr_controller = 0.0;
-  if (std::abs(xl_error_meters) <= tolerance) xl_controller = 0.0;
-  if (std::abs(y_error_meters) <= tolerance) y_controller = 0.0;
-
   // Minimum command only outside tolerance
-  if (xr_controller > 0.0 && xr_controller < 15.0) xr_controller = 15.0;
-  if (xr_controller < 0.0 && xr_controller > -15.0) xr_controller = -15.0;
+  if (theta_controller > 0.0 && theta_controller < 25.0) theta_controller = 25.0;
+  if (theta_controller < 0.0 && theta_controller > -25.0) theta_controller = -25.0;
+  if (xr_controller > 0.0 && xr_controller < 25.0) xr_controller = 25.0;
+  if (xr_controller < 0.0 && xr_controller > -25.0) xr_controller = -25.0;
+  if (xl_controller > 0.0 && xl_controller < 25.0) xl_controller = 25.0;
+  if (xl_controller < 0.0 && xl_controller > -25.0) xl_controller = -25.0;
+  if (y_controller > 0.0 && y_controller < 15.0) y_controller = 15.0;
+  if (y_controller < 0.0 && y_controller > -15.0) y_controller = -15.0;
 
-  if (xl_controller > 0.0 && xl_controller < 15.0) xl_controller = 15.0;
-  if (xl_controller < 0.0 && xl_controller > -15.0) xl_controller = -15.0;
-
-  if (y_controller > 0.0 && y_controller < 10.0) y_controller = 10.0;
-  if (y_controller < 0.0 && y_controller > -10.0) y_controller = -10.0;
-*/
   // Command magnitudes
   double spdr = std::abs(xr_controller);
   double spdl = std::abs(xl_controller);
@@ -532,7 +550,7 @@ void Robot::AutonomousPeriodic() {
     RoboClawM1Backward(kRoboClawAddr2, spdy);
   } else {
     RoboClawM1Forward(kRoboClawAddr2, 0);
-  }
+  } 
 
   frc::SmartDashboard::PutNumber("X Target M", x_target_meters);
   frc::SmartDashboard::PutNumber("Y Target M", y_target_meters);

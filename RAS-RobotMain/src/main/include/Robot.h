@@ -84,15 +84,14 @@ class Robot : public frc::TimesliceRobot {
 
   //PID Tuning
   // Gains
-  double x_kP = 250.0;
-  double x_kI = 0.0;
-  double x_kD = 0.0;
-  double y_kP = 200.0;
-  double y_kI = 5.0;
+  double x_kP = 80.0;
+  double x_kI = 10.0;
+  double x_kD = 5.0;
+  double y_kP = 90.0;
+  double y_kI = 10.0;
   double y_kD = 2.0;
-  double theta_kP = 100.0;
-  double theta_kI = 0.0;
-  double theta_kD = 0.0;
+  double theta_kI = 5.0;
+  double theta_kD = 0.5;
   //Forward/Backward wheel PID state
   double x_integral = 0.0;
   double x_prevError = 0.0;
