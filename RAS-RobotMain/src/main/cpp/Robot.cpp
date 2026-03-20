@@ -13,8 +13,14 @@
 #include <iostream>
 #include <numbers>
 
-int HallServoInitPos = 500; //Closed position
-int HallServoOpenPos = 1500;  //Open Position
+int HallServoInitPos = 500; //Hall Servo Closed position
+int HallServoOpenPos = 1500;  //Hall Servo Open Position
+int BrushServoInitPos = 500; //Closed position
+int BrushServoOpenPos = 1500;  //Open Position
+int ArmServoInitPos = 500; //Closed position
+int ArmServoOpenPos = 1500;  //Open Position
+int ReleaseServoInitPos = 500; //Closed position
+int ReleaseServoOpenPos = 1500;  //Open Position
 int pulse = 500;
 int dir = 1;
 int counter = 0;
@@ -43,15 +49,15 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   // m_chooser.AddOption(kAutoNameCustom, kAutoNameCustom);
   frc::SmartDashboard::PutData("Auto Modes", &m_chooser);
 
-  m_servo0.SetPowered(true);
-  m_servo1.SetPowered(true);
-  m_servo2.SetPowered(true);
-  m_servo3.SetPowered(true);
+  m_servoArm.SetPowered(true);
+  m_servoBrush.SetPowered(true);
+  m_servoRelease.SetPowered(true);
+  m_servoHall.SetPowered(true);
 
-  m_servo0.SetEnabled(true);
-  m_servo1.SetEnabled(true);
-  m_servo2.SetEnabled(true);
-  m_servo3.SetEnabled(true); 
+  m_servoArm.SetEnabled(true);
+  m_servoBrush.SetEnabled(true);
+  m_servoRelease.SetEnabled(true);
+  m_servoHall.SetEnabled(true); 
 
   InitIMU();
 
@@ -221,12 +227,15 @@ void Robot::RoboClawStopAll(){
 void Robot::RobotPeriodic() {
   //Magnetic orbs hatch door function
   /*if (m_hallDigital.Get() == false) {
-    m_servo0.SetPulseWidth(HallServoOpenPos);
+    m_servo2.SetPulseWidth(HallServoOpenPos);
   }
   else {
-    m_servo0.SetPulseWidth(HallServoInitPos);
+    m_servo2.SetPulseWidth(HallServoInitPos);
   } */
-  frc::SmartDashboard::PutNumber("Current servo 0 location", m_servo0.GetPulseWidth());
+  m_servoHall.SetPulseWidth(HallServoInitPos);
+  m_servoRelease.SetPulseWidth(ReleaseServoInitPos);
+  m_servoArm.SetPulseWidth(ArmServoInitPos);
+  m_servoBrush.SetPulseWidth(HallServoInitPos);
   //hall sensor dashboard values
   frc::SmartDashboard::PutNumber("Hall Voltage (V)", m_hallAnalog.GetVoltage());
   frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
@@ -517,9 +526,9 @@ void Robot::AutonomousPeriodic() {
   double abs_theta_error = std::abs(theta_error);
   double scheduled_theta_kP = 40.0;
   if (abs_theta_error > std::numbers::pi / 4) {
-    scheduled_theta_kP = 60.0;
-  } else if (abs_theta_error > std::numbers::pi / 12) {
     scheduled_theta_kP = 80.0;
+  } else if (abs_theta_error > std::numbers::pi / 12) {
+    scheduled_theta_kP = 60.0;
   }
 
   // PID controller
@@ -537,7 +546,6 @@ void Robot::AutonomousPeriodic() {
   double y_tolerance = 0.005;
   double theta_tolerance = 0.02;
 
-  double tolerance = 0.005;
   if (std::abs(x_error_meters) <= x_tolerance) {
     x_controller = 0.0;
     x_integral = 0.0;

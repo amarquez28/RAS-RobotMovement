@@ -82,10 +82,10 @@ class Robot : public frc::TimesliceRobot {
   //servohub id and channel configuration
   static constexpr int kServoHubId = 20;
   rev::servohub::ServoHub m_servoHub{kServoHubId};
-  rev::servohub::ServoChannel& m_servo0{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId0)};
-  rev::servohub::ServoChannel& m_servo1{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId1)};
-  rev::servohub::ServoChannel& m_servo2{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};
-  rev::servohub::ServoChannel& m_servo3{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId3)};
+  rev::servohub::ServoChannel& m_servoBrush{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId0)}; //Brush
+  rev::servohub::ServoChannel& m_servoRelease{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId4)}; //Release Orbs Door
+  rev::servohub::ServoChannel& m_servoHall{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)}; //Hall Sensor
+  rev::servohub::ServoChannel& m_servoArm{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId5)}; //Arm
   //PID Tuning
   // Gains
   double x_kP = 91.0;
