@@ -175,7 +175,7 @@ class Robot : public frc::TimesliceRobot {
   // Adjust after measurement. A rightward camera offset typically produces a
   // value LESS than 740 (the tag appears left of the frame centre when
   // the robot is pointed straight at it).
-  static constexpr double kCameraCenter_px = 555.0;
+  static constexpr double kCameraCenter_px = 590.0;
  
   // How far off-center (pixels) before we apply a lateral correction.
   static constexpr double kCenterTolerance_px = 40.0;
