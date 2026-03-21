@@ -181,7 +181,7 @@ class Robot : public frc::TimesliceRobot {
   // Start at 0.3 and tune upward if the robot fails to track a laterally
   // offset tag, or downward if it oscillates.
   //   If the robot isn't correcting enough, increase it. If it oscillates side to side, decrease it.
-  static constexpr double kSteerFactor = 0.2;
+  static constexpr double kSteerFactor = 0.1;
  
   // ── NetworkTables publishers ─────────────────────────────────────────────
   // Vision/task_done   → Pi reads this to know the robot has arrived.
