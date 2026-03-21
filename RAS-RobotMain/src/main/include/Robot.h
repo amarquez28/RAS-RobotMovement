@@ -157,31 +157,28 @@ class Robot : public frc::TimesliceRobot {
   bool m_autoComplete = false; 
 
   // Servo pulse widths (microseconds)
-  static constexpr int kHallServoInitPos = 500;   // Closed
-  static constexpr int kHallServoOpenPos = 1500;  // Open
-  static constexpr int BrushServoInitPos = 500;                    // Closed position
-  static constexpr int BrushServoOpenPos = 1500;                   // Open Position
-  static constexpr int ArmServoInitPos = 500;                      // Closed position
-  static constexpr int ArmServoOpenPos = 1500;                     // Open Position
-  static constexpr int ReleaseServoInitPos = 500;                  // Closed position
-  static constexpr int ReleaseServoOpenPos = 1500;                 // Open Position
-  static constexpr int pulse = 500;
-  static constexpr int dir = 1;
-  static constexpr int counter = 0;
-  static constexpr bool start = false;
+  static constexpr int kHallServoInitPos    = 500;   // Closed
+  static constexpr int kHallServoOpenPos    = 1500;  // Open
+  static constexpr int BrushServoInitPos    = 500;
+  static constexpr int BrushServoOpenPos    = 1500;
+  static constexpr int ArmServoInitPos      = 500;
+  static constexpr int ArmServoOpenPos      = 1500;
+  static constexpr int ReleaseServoInitPos  = 500;
+  static constexpr int ReleaseServoOpenPos  = 1500;
 
   // ── IMU (MPU-6050 on I²C onboard port, addr 0x68) ──────────────────────
   frc::I2C m_imu{frc::I2C::Port::kOnboard, 0x68};
 
-  bool  IMUWriteReg (uint8_t reg, uint8_t data);
-  bool  IMUReadRegs (uint8_t startReg, uint8_t* out, int len);
-  void  IMUInit     ();
-  void  IMUUpdate   ();   // Integrates gyro Z → m_yaw_deg
-  void  IMUDashboard();   // Pushes raw + converted values to SmartDashboard
+  bool  IMUWriteReg  (uint8_t reg, uint8_t data);
+  bool  IMUReadRegs  (uint8_t startReg, uint8_t* out, int len);
+  void  IMUInit      ();
+  void  IMUUpdate    ();          // Integrates gyro Z → m_yaw_deg (degrees)
+  void  IMUDashboard ();          // Pushes raw + converted values to SmartDashboard
+  bool  ReadIMURadps (double& gz_radps_out); // Reads gyro-Z in rad/s for PID
 
-  // Integrated yaw (degrees). Positive = counter-clockwise when viewed from top.
-  //double          m_yaw_deg       = 0.0;
-  //double          m_lastGyroZ_dps = 0.0;
+  // Integrated yaw in degrees – used by RobotPeriodic / sweep / dashboard.
+  double          m_yaw_deg       = 0.0;
+  double          m_lastGyroZ_dps = 0.0;
   units::second_t m_lastIMUTime{0};
 
   // ── Encoder snapshot used by sweep ─────────────────────────────────────
