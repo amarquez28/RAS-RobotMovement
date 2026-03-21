@@ -31,6 +31,7 @@
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+#include <numbers>
 
 // ── Constructor ──────────────────────────────────────────────────────────────
 
@@ -45,10 +46,10 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
     frc::SmartDashboard::PutData("Auto Modes", &m_chooser);
 
     // Power and enable all four servo channels
-    m_servo0.SetPowered(true);  m_servo0.SetEnabled(true);
-    m_servo1.SetPowered(true);  m_servo1.SetEnabled(true);
-    m_servo2.SetPowered(true);  m_servo2.SetEnabled(true);
-    m_servo3.SetPowered(true);  m_servo3.SetEnabled(true);
+    m_servoBrush.SetPowered(true);  m_servoBrush.SetEnabled(true);
+    m_servoRelease.SetPowered(true);  m_servoRelease.SetEnabled(true);
+    m_servoHall.SetPowered(true);  m_servoHall.SetEnabled(true);
+    m_servoArm.SetPowered(true);  m_servoArm.SetEnabled(true);
 
     // Initialise IMU
     IMUInit();
@@ -157,6 +158,26 @@ bool Robot::RoboClawReadEncoderM1(uint8_t addr, int32_t& count, uint8_t& status)
 }
 bool Robot::RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status) {
     return RoboClawReadEncoder(addr, 17, count, status);
+}
+
+//Roboclaw encoder reset for testing
+void Robot::RoboClawResetEncoder(uint8_t addr) {
+  uint8_t pkt[2] = {addr, 20}; // command 20 = Reset Encoders
+  uint16_t crc = RoboClawCRC16(pkt, 2);
+
+  uint8_t out[4] = {
+    addr,
+    20,
+    static_cast<uint8_t>((crc >> 8) & 0xFF),
+    static_cast<uint8_t>(crc & 0xFF)
+  };
+
+  m_roboclaw.Write(reinterpret_cast<const char*>(out), 4);
+}
+
+void Robot::RoboClawResetAllEncoders() {
+  RoboClawResetEncoder(kRoboClawAddr_Drive);
+  RoboClawResetEncoder(kRoboClawAddr_Strafe);
 }
 
 // ── Per-motor direction wrappers ─────────────────────────────────────────────
@@ -314,9 +335,24 @@ void Robot::IMUUpdate() {
     // Clamp dt to avoid huge integration jumps on first call or stalls
     if (dt > 0.05) dt = 0.05;
 
+    //TODO: convert this into radians since thats what we are using
     // Trapezoidal integration (average of previous and current sample)
-    m_yaw_deg += ((m_lastGyroZ_dps + gz_dps) / 2.0) * dt;
-    m_lastGyroZ_dps = gz_dps;
+    //m_yaw_deg += ((m_lastGyroZ_dps + gz_dps) / 2.0) * dt;
+    // m_lastGyroZ_dps = gz_dps;
+}
+//TOD0: Merge the two functions ↑ & ↓
+static bool ReadIMU(double& gz_radps_out) {
+  uint8_t data[14] = {0};
+  bool readErr = ReadRegs(0x3B, data, 14);
+  if (readErr) return false;
+
+  int16_t gz = ToInt16(data[12], data[13]);
+
+  double gz_dps = gz / 131.0;
+  double gz_radps = gz_dps * std::numbers::pi / 180.0;
+
+  gz_radps_out = gz_radps;
+  return true;
 }
 
 // IMUDashboard() – push all raw and converted IMU data to SmartDashboard
@@ -339,9 +375,54 @@ void Robot::IMUDashboard() {
     frc::SmartDashboard::PutNumber("IMU/Gyro_dps_X",  gx / 131.0);
     frc::SmartDashboard::PutNumber("IMU/Gyro_dps_Y",  gy / 131.0);
     frc::SmartDashboard::PutNumber("IMU/Gyro_dps_Z",  gz / 131.0);
-    frc::SmartDashboard::PutNumber("IMU/Yaw_deg",     m_yaw_deg);
+    // frc::SmartDashboard::PutNumber("IMU/Yaw_deg",     m_yaw_deg);
 }
 
+// Convert two bytes (big-endian) to signed 16-bit
+static int16_t ToInt16(uint8_t hi, uint8_t lo) {
+  return static_cast<int16_t>((hi << 8) | lo);
+}
+
+double Robot::WrapAngle(double angle) {
+  while (angle > std::numbers::pi) {
+    angle -= 2.0 * std::numbers::pi;
+  }
+  while (angle < -std::numbers::pi) {
+    angle += 2.0 * std::numbers::pi;
+  }
+  return angle;
+}
+
+void Robot::LoadAutonomousSetpoints() {
+  m_setpoints = {
+    {0.20, 0.0, 0.0},
+    {0.20, 0.0, std::numbers::pi / 2.0},
+    {0.40, 0.0, std::numbers::pi / 2.0}
+  };
+
+  m_currentSetpointIndex = 0;
+  m_autoComplete = m_setpoints.empty();
+}
+
+void Robot::AdvanceToNextSetpoint() {
+  ResetPidState();
+
+  if (m_currentSetpointIndex + 1 < m_setpoints.size()) {
+    m_currentSetpointIndex++;
+  } else {
+    m_autoComplete = true;
+  }
+}
+
+void Robot::ResetPidState() {
+  x_integral = 0.0;
+  y_integral = 0.0;
+  theta_integral = 0.0;
+
+  x_prevError = 0.0;
+  y_prevError = 0.0;
+  theta_prevError = 0.0;
+}
 // ============================================================================
 //  Encoder odometry update
 // ============================================================================
@@ -376,19 +457,44 @@ void Robot::RobotPeriodic() {
 
     // Hall sensor → hatch door servo
     if (!m_hallDigital.Get()) {
-        m_servo0.SetPulseWidth(kHallServoOpenPos);
+        m_servoBrush.SetPulseWidth(kHallServoOpenPos);
     } else {
-        m_servo0.SetPulseWidth(kHallServoInitPos);
+        m_servoBrush.SetPulseWidth(kHallServoInitPos);
     }
 
     // Dashboard: servo + hall sensor
-    frc::SmartDashboard::PutNumber ("Servo0/PulseWidth", m_servo0.GetPulseWidth());
+    frc::SmartDashboard::PutNumber ("Servo0/PulseWidth", m_servoBrush.GetPulseWidth());
     frc::SmartDashboard::PutNumber ("Hall/Voltage_V",    m_hallAnalog.GetVoltage());
     frc::SmartDashboard::PutNumber ("Hall/Raw",          m_hallAnalog.GetValue());
     frc::SmartDashboard::PutBoolean("Hall/Digital",      m_hallDigital.Get());
 
     // IMU dashboard (non-integrated values for debugging)
     IMUDashboard();
+}
+
+void Robot::CalibrateGyroZBias() {
+  constexpr int kSamples = 500;
+
+  double sum = 0.0;
+  int count = 0;
+
+  for (int i = 0; i < kSamples; i++) {
+    double gz_radps = 0.0;
+
+    if (ReadIMU(gz_radps)) {
+      sum += gz_radps;
+      count++;
+    }
+
+    frc::Wait(0.002_s);
+  }
+
+  if (count > 0) {
+    m_gyroZBiasRadps = sum / count;
+  }
+
+  frc::SmartDashboard::PutNumber(
+    "IMU_Calibrated_GyroZBias_radps", m_gyroZBiasRadps);
 }
 
 // ============================================================================
@@ -398,11 +504,15 @@ void Robot::RobotPeriodic() {
 void Robot::AutonomousInit() {
     m_timer.Reset();
     m_timer.Start();
+    RoboClawResetAllEncoders();
     RoboClawDrain();
+    CalibrateGyroZBias();
+    LoadAutonomousSetpoints();
 
+    // TODO: again, use radians not degrees
     // Reset heading integrator at the start of every auto run
-    m_yaw_deg       = 0.0;
-    m_lastGyroZ_dps = 0.0;
+    // m_yaw_deg       = 0.0;
+    // m_lastGyroZ_dps = 0.0;
     m_lastIMUTime   = frc::Timer::GetFPGATimestamp();
 
     // Re-init IMU in case of power cycle
@@ -423,7 +533,7 @@ void Robot::AutonomousInit() {
     m_horizTicks = 0;
 
     // Close hatch door
-    m_servo0.SetPulseWidth(kHallServoInitPos);
+    m_servoBrush.SetPulseWidth(kHallServoInitPos);
 
     // Safety stop all drive motors
     RoboClawStopAll();
@@ -460,11 +570,81 @@ void Robot::AutonomousPeriodic() {
     bool visionConnected = m_aprilTagReader.IsConnected();
     frc::SmartDashboard::PutBoolean("Vision/PiConnected", visionConnected);
 
+
+    units::second_t now = frc::Timer::GetFPGATimestamp();
+    double dt = 0.0;
+    if (m_firstPidLoop)
+    {
+        m_prevTime = now;
+        m_firstPidLoop = false;
+        return; // skip one cycle so dt is valid next time
+    }
+    dt = (now - m_prevTime).value();
+    m_prevTime = now;
+    if (dt <= 1e-4 || dt > 0.1)
+    {
+        dt = 0.02; // fallback
+    }
+
+    // IMU Values
+    double gz_radps;
+    bool ok = ReadIMU(gz_radps);
+    double omega_z = gz_radps - m_gyroZBiasRadps;
+    m_thetaRad += omega_z * dt;
+    m_thetaRad = WrapAngle(m_thetaRad);
+    frc::SmartDashboard::PutBoolean("IMU_Read OK", ok);
+    frc::SmartDashboard::PutNumber("IMU_GyroZ_radps", gz_radps);
+    frc::SmartDashboard::PutNumber("IMU_GyroZ_Bias_radps", m_gyroZBiasRadps);
+    frc::SmartDashboard::PutNumber("IMU_OmegaZ_radps", omega_z);
+    frc::SmartDashboard::PutNumber("IMU_Theta_rad", m_thetaRad);
+
+    // Encoder values, first we check if we are receiving all bytes then we handle the information into the dashboard
+    int32_t e80_m1, e80_m2, e81_m1;
+    uint8_t s80_m1, s80_m2, s81_m1;
+
+    bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr_Drive, e80_m1, s80_m1);
+    bool ok80_2 = RoboClawReadEncoderM2(kRoboClawAddr_Drive, e80_m2, s80_m2);
+    bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr_Strafe, e81_m1, s81_m1);
+
+    frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok80_1);
+    frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok80_2);
+    frc::SmartDashboard::PutBoolean("RC2 Encoder1 OK", ok81_1);
+
+    if (ok80_1)
+        frc::SmartDashboard::PutNumber("RC1 Encoder1", (double)e80_m1);
+    if (ok80_2)
+        frc::SmartDashboard::PutNumber("RC1 Encoder2", (double)e80_m2);
+    if (ok81_1)
+        frc::SmartDashboard::PutNumber("RC2 Encoder1", (double)e81_m1);
+
+    // Encoder unit conversions
+    double wd = 0.072;
+    double wcirc = std::numbers::pi * wd;
+    double x_mperpul = wcirc / 758.8;
+    double y_mperpul = wcirc / 1425.1;
+
+    // Convert pulses to actual meters traveled
+    double xr_m_position = e80_m1 * x_mperpul;
+    double xl_m_position = e80_m2 * x_mperpul;
+    double y_m_position = e81_m1 * y_mperpul;
+    // Pose estimation
+    double x_m_position = (xr_m_position + xl_m_position) / 2.0;
+    // IMU estimation (get Yaw in radians not degrees)
+    double theta_position = m_thetaRad; // IMU data will load this variable
+
     // ── DONE: task already complete, just hold still ───────────────────────
     if(m_taskDone){
         StopAllDrive();
         return;
     }
+    /* OR we use setpoints */
+    // Setpoints
+    // if (m_autoComplete || m_setpoints.empty())
+    // {
+    //     RoboClawStopAll();
+    //     frc::SmartDashboard::PutString("Auto Status", "Complete");
+    //     return;
+    // }
 
     // Read the most recent AprilTag (if any)
     bool hasTag = m_aprilTagReader.HasTarget();
@@ -476,6 +656,162 @@ void Robot::AutonomousPeriodic() {
         if(tag.distance <= 0.0){
             hasTag = false;
         }
+    }
+
+    double x_target_meters = target.x_trgt; //Target would be tag?
+    double y_target_meters = target.y_trgt;
+    double theta_target_rads = target.theta_rad_trgt;
+
+    // Errors
+    double x_error_meters = x_target_meters - x_m_position;
+    double y_error_meters = y_target_meters - y_m_position;
+    double theta_error = WrapAngle(theta_target_rads - theta_position);
+
+    // Integral
+    x_integral += x_error_meters * dt;
+    y_integral += y_error_meters * dt;
+    theta_integral += theta_error * dt;
+    // Anti-windup clamp
+    x_integral = std::clamp(x_integral, -10.0, 10.0);
+    y_integral = std::clamp(y_integral, -10.0, 10.0);
+    theta_integral = std::clamp(theta_integral, -10.0, 10.0);
+
+    // Derivative
+    double x_derivative = (x_error_meters - x_prevError) / dt;
+    double y_derivative = (y_error_meters - y_prevError) / dt;
+    double theta_derivative = (theta_error - theta_prevError) / dt;
+
+    // Gain Scheduling
+    double abs_theta_error = std::abs(theta_error);
+    double scheduled_theta_kP = 40.0;
+    if (abs_theta_error > std::numbers::pi / 4)
+    {
+        scheduled_theta_kP = 80.0;
+    }
+    else if (abs_theta_error > std::numbers::pi / 12)
+    {
+        scheduled_theta_kP = 60.0;
+    }
+
+    // PID controller
+    double x_controller = x_kP * x_error_meters + x_kI * x_integral + x_kD * x_derivative;
+    double y_controller = y_kP * y_error_meters + y_kI * y_integral + y_kD * y_derivative;
+    double theta_controller = scheduled_theta_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_derivative;
+
+    // Save error for next loop
+    x_prevError = x_error_meters;
+    y_prevError = y_error_meters;
+    theta_prevError = theta_error;
+
+    // Tolerance
+    double x_tolerance = 0.005;
+    double y_tolerance = 0.005;
+    double theta_tolerance = 0.02;
+
+    if (std::abs(x_error_meters) <= x_tolerance)
+    {
+        x_controller = 0.0;
+        x_integral = 0.0;
+    }
+    if (std::abs(y_error_meters) <= y_tolerance)
+    {
+        y_controller = 0.0;
+        y_integral = 0.0;
+    }
+    if (std::abs(theta_error) <= theta_tolerance)
+    {
+        theta_controller = 0.0;
+        theta_integral = 0.0;
+    }
+
+    // At target logic
+    bool x_at_target = std::abs(x_error_meters) <= x_tolerance;
+    bool y_at_target = std::abs(y_error_meters) <= y_tolerance;
+    bool theta_at_target = std::abs(theta_error) <= theta_tolerance;
+
+    if (x_at_target && y_at_target && theta_at_target)
+    {
+        AdvanceToNextSetpoint();
+        RoboClawStopAll();
+        return;
+    }
+
+    // Saturation
+    x_controller = std::clamp(x_controller, -127.0, 127.0);
+    y_controller = std::clamp(y_controller, -127.0, 127.0);
+    theta_controller = std::clamp(theta_controller, -80.0, 80.0);
+
+    // Minimum command only outside tolerance
+    if (theta_controller > 0.0 && theta_controller < 25.0)
+        theta_controller = 25.0;
+    if (theta_controller < 0.0 && theta_controller > -25.0)
+        theta_controller = -25.0;
+    if (y_controller > 0.0 && y_controller < 15.0)
+        y_controller = 15.0;
+    if (y_controller < 0.0 && y_controller > -15.0)
+        y_controller = -15.0;
+
+    // Motor Mixing
+    double xr_controller = x_controller + theta_controller;
+    double xl_controller = x_controller - theta_controller;
+
+    // Clamp mixed wheel commands
+    xr_controller = std::clamp(xr_controller, -127.0, 127.0);
+    xl_controller = std::clamp(xl_controller, -127.0, 127.0);
+
+    // Minimum tolerance for mixed motors
+    if (xr_controller > 0.0 && xr_controller < 25.0)
+        xr_controller = 25.0;
+    if (xr_controller < 0.0 && xr_controller > -25.0)
+        xr_controller = -25.0;
+    if (xl_controller > 0.0 && xl_controller < 25.0)
+        xl_controller = 25.0;
+    if (xl_controller < 0.0 && xl_controller > -25.0)
+        xl_controller = -25.0;
+
+    // Command magnitudes
+    double spdr = std::abs(xr_controller);
+    double spdl = std::abs(xl_controller);
+    double spdy = std::abs(y_controller);
+
+    // Command motors separately
+    if (xr_controller > 0.0)
+    {
+        RoboClawM1Forward(kRoboClawAddr_Drive, spdr);
+    }
+    else if (xr_controller < 0.0)
+    {
+        RoboClawM1Backward(kRoboClawAddr_Drive, spdr);
+    }
+    else
+    {
+        RoboClawM1Forward(kRoboClawAddr_Drive, 0);
+    }
+
+    if (xl_controller > 0.0)
+    {
+        RoboClawM2Forward(kRoboClawAddr_Drive, spdl);
+    }
+    else if (xl_controller < 0.0)
+    {
+        RoboClawM2Backward(kRoboClawAddr_Drive, spdl);
+    }
+    else
+    {
+        RoboClawM2Forward(kRoboClawAddr_Drive, 0);
+    }
+
+    if (y_controller > 0.0)
+    {
+        RoboClawM1Forward(kRoboClawAddr_Strafe, spdy);
+    }
+    else if (y_controller < 0.0)
+    {
+        RoboClawM1Backward(kRoboClawAddr_Strafe, spdy);
+    }
+    else
+    {
+        RoboClawM1Forward(kRoboClawAddr_Strafe, 0);
     }
 
     switch (m_autoPhase)
@@ -548,7 +884,7 @@ void Robot::AutonomousPeriodic() {
     }
     // ── 7. Dashboard summary ──────────────────────────────────────────────
     frc::SmartDashboard::PutNumber("Auto/ElapsedTime_s", m_timer.Get().value());
-    frc::SmartDashboard::PutNumber("Auto/Yaw_deg",       m_yaw_deg);
+    // frc::SmartDashboard::PutNumber("Auto/Yaw_deg",       m_yaw_deg);
     frc::SmartDashboard::PutNumber("Auto/VertTicks",     m_vertTicks);
     frc::SmartDashboard::PutNumber("Auto/HorizTicks",    m_horizTicks);
 }
