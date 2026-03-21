@@ -119,8 +119,7 @@ class Robot : public frc::TimesliceRobot {
   rev::servohub::ServoChannel &m_servoHall{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};//hall sensor
   rev::servohub::ServoChannel &m_servoArm{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId5)};//arm
 
-  // PID Tuning
-  //  Gains
+  // PID Tuning gains
   double x_kP = 91.0;
   double x_kI = 8.0;
   double x_kD = 5.0;
@@ -135,14 +134,14 @@ class Robot : public frc::TimesliceRobot {
   // Strafe wheel PID state
   double y_integral = 0.0;
   double y_prevError = 0.0;
-  // Theta (IMU) PID State
-  double theta_integral = 0.0;
+  // Theta PID state
+  double theta_integral  = 0.0;
   double theta_prevError = 0.0;
-  double m_thetaRad = 0.0;
+  // Gyro bias (rad/s) – measured during CalibrateGyroZBias() in AutonomousInit
   double m_gyroZBiasRadps = 0.0;
 
-  //Time tracking
-  units::second_t m_prevTime = 0_s;
+  // Time tracking for PID dt
+  units::second_t m_prevTime   = 0_s;
   bool m_firstPidLoop = true;
 
     //Setpoint declaration
@@ -172,13 +171,15 @@ class Robot : public frc::TimesliceRobot {
   bool  IMUWriteReg  (uint8_t reg, uint8_t data);
   bool  IMUReadRegs  (uint8_t startReg, uint8_t* out, int len);
   void  IMUInit      ();
-  void  IMUUpdate    ();          // Integrates gyro Z → m_yaw_deg (degrees)
-  void  IMUDashboard ();          // Pushes raw + converted values to SmartDashboard
-  bool  ReadIMURadps (double& gz_radps_out); // Reads gyro-Z in rad/s for PID
+  void  IMUUpdate    ();   // Single I2C read per tick; integrates gyro-Z → m_thetaRad
+  void  IMUDashboard ();   // Pushes raw + converted values to SmartDashboard
 
-  // Integrated yaw in degrees – used by RobotPeriodic / sweep / dashboard.
-  double          m_yaw_deg       = 0.0;
-  double          m_lastGyroZ_dps = 0.0;
+  // Integrated yaw in radians. Updated by IMUUpdate() every RobotPeriodic() tick.
+  // m_thetaRad is the bias-corrected heading used by the PID controller.
+  // m_yaw_rad  is the un-corrected heading used by sweep / dashboard.
+  double          m_thetaRad         = 0.0;  // bias-corrected, PID heading
+  double          m_yaw_rad          = 0.0;  // raw integrated yaw (dashboard/sweep)
+  double          m_lastGyroZ_radps  = 0.0;  // previous sample for trapezoidal integration
   units::second_t m_lastIMUTime{0};
 
   // ── Encoder snapshot used by sweep ─────────────────────────────────────

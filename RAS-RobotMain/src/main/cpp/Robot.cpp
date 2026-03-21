@@ -279,24 +279,36 @@ void Robot::IMUInit() {
 }
 
 // IMUUpdate() – called every RobotPeriodic() tick.
-// Integrates gyro-Z in degrees (m_yaw_deg) for use by dashboard / sweep.
-// The PID controller in AutonomousPeriodic uses m_thetaRad (radians) instead,
-// which it integrates independently with bias correction.
+// Performs ONE I2C burst read per tick and integrates gyro-Z in radians.
+//
+//   m_thetaRad  : bias-corrected heading used by the PID controller.
+//   m_yaw_rad   : raw (no bias correction) heading used by sweep / dashboard.
+//
+// Having a single read here means AutonomousPeriodic() reads m_thetaRad
+// directly instead of issuing a second I2C transaction.
 void Robot::IMUUpdate() {
     uint8_t data[14] = {0};
-    if (IMUReadRegs(0x3B, data, 14)) return; // read error → skip
+    if (IMUReadRegs(0x3B, data, 14)) return; // I2C error → skip, keep last value
 
-    int16_t gz_raw = ToInt16(data[12], data[13]);
-    double  gz_dps = gz_raw / 131.0; // ±250 dps scale factor
+    int16_t gz_raw    = ToInt16(data[12], data[13]);
+    double  gz_radps  = (gz_raw / 131.0) * (std::numbers::pi / 180.0);
 
     auto   now = frc::Timer::GetFPGATimestamp();
     double dt  = (now - m_lastIMUTime).value();
     m_lastIMUTime = now;
-    if (dt > 0.05) dt = 0.05; // guard against large jumps on first call
+    if (dt <= 0.0 || dt > 0.05) dt = 0.005; // guard: clamp to 5 ms on first call
 
-    // Trapezoidal integration for the degree-based yaw (used by sweep / dashboard)
-    m_yaw_deg += ((m_lastGyroZ_dps + gz_dps) / 2.0) * dt;
-    m_lastGyroZ_dps = gz_dps;
+    // Trapezoidal integration (average of previous and current sample)
+    double avg_radps = (m_lastGyroZ_radps + gz_radps) / 2.0;
+    m_lastGyroZ_radps = gz_radps;
+
+    // Raw yaw (no bias correction) – used by sweep and dashboard
+    m_yaw_rad  += avg_radps * dt;
+    m_yaw_rad   = WrapAngle(m_yaw_rad);
+
+    // Bias-corrected heading used by PID
+    m_thetaRad += (avg_radps - m_gyroZBiasRadps) * dt;
+    m_thetaRad  = WrapAngle(m_thetaRad);
 }
 
 // IMUDashboard() – push all raw and converted IMU data to SmartDashboard
@@ -313,52 +325,39 @@ void Robot::IMUDashboard() {
     int16_t gy = ToInt16(data[10], data[11]);
     int16_t gz = ToInt16(data[12], data[13]);
 
-    frc::SmartDashboard::PutNumber("IMU/Accel_g_X",  ax / 16384.0);
-    frc::SmartDashboard::PutNumber("IMU/Accel_g_Y",  ay / 16384.0);
-    frc::SmartDashboard::PutNumber("IMU/Accel_g_Z",  az / 16384.0);
-    frc::SmartDashboard::PutNumber("IMU/Gyro_dps_X", gx / 131.0);
-    frc::SmartDashboard::PutNumber("IMU/Gyro_dps_Y", gy / 131.0);
-    frc::SmartDashboard::PutNumber("IMU/Gyro_dps_Z", gz / 131.0);
-    frc::SmartDashboard::PutNumber("IMU/Yaw_deg",    m_yaw_deg);
-}
-
-// ReadIMURadps() – reads gyro-Z and returns it in rad/s.
-// Used exclusively by CalibrateGyroZBias() and AutonomousPeriodic() so that
-// the PID controller works in radians throughout.
-bool Robot::ReadIMURadps(double& gz_radps_out) {
-    uint8_t data[14] = {0};
-    if (IMUReadRegs(0x3B, data, 14)) return false;
-
-    int16_t gz     = ToInt16(data[12], data[13]);
-    double  gz_dps = gz / 131.0;
-    gz_radps_out   = gz_dps * std::numbers::pi / 180.0;
-    return true;
+    frc::SmartDashboard::PutNumber("IMU/Accel_g_X",    ax / 16384.0);
+    frc::SmartDashboard::PutNumber("IMU/Accel_g_Y",    ay / 16384.0);
+    frc::SmartDashboard::PutNumber("IMU/Accel_g_Z",    az / 16384.0);
+    frc::SmartDashboard::PutNumber("IMU/Gyro_radps_X", (gx / 131.0) * (std::numbers::pi / 180.0));
+    frc::SmartDashboard::PutNumber("IMU/Gyro_radps_Y", (gy / 131.0) * (std::numbers::pi / 180.0));
+    frc::SmartDashboard::PutNumber("IMU/Gyro_radps_Z", (gz / 131.0) * (std::numbers::pi / 180.0));
+    frc::SmartDashboard::PutNumber("IMU/Yaw_rad",      m_yaw_rad);
+    frc::SmartDashboard::PutNumber("IMU/Theta_rad",    m_thetaRad);
 }
 
 // ============================================================================
 //  Gyro bias calibration
 //  Call once in AutonomousInit() while the robot is stationary.
-//  Averages 500 IMU samples to estimate the static Z-axis bias.
+//  Averages 500 IMU samples (in rad/s) to estimate the static Z-axis bias.
 // ============================================================================
 
 void Robot::CalibrateGyroZBias() {
     constexpr int kSamples = 500;
-    double sum = 0.0;
+    double sum   = 0.0;
     int    count = 0;
 
     for (int i = 0; i < kSamples; i++) {
-        double gz_radps = 0.0;
-        if (ReadIMURadps(gz_radps)) {
-            sum += gz_radps;
+        uint8_t data[14] = {0};
+        if (!IMUReadRegs(0x3B, data, 14)) {  // false = success
+            int16_t gz    = ToInt16(data[12], data[13]);
+            double gz_rps = (gz / 131.0) * (std::numbers::pi / 180.0);
+            sum += gz_rps;
             count++;
         }
         frc::Wait(0.002_s);
     }
 
-    if (count > 0) {
-        m_gyroZBiasRadps = sum / count;
-    }
-
+    m_gyroZBiasRadps = (count > 0) ? (sum / count) : 0.0;
     frc::SmartDashboard::PutNumber("IMU/GyroZBias_radps", m_gyroZBiasRadps);
 }
 
@@ -427,7 +426,7 @@ void Robot::ResetPidState() {
 // ============================================================================
 
 void Robot::RobotPeriodic() {
-    // Integrate IMU every tick for consistent dt (yaw in degrees for sweep/dashboard)
+    // Single IMU I2C read per tick – updates m_thetaRad and m_yaw_rad
     IMUUpdate();
 
     // AprilTag dashboard (vision system health + tag data)
@@ -464,16 +463,16 @@ void Robot::AutonomousInit() {
     // Re-init IMU in case of a power cycle between runs
     IMUInit();
 
-    // Zero the degree-based integrator used by sweep / dashboard
-    m_yaw_deg       = 0.0;
-    m_lastGyroZ_dps = 0.0;
-    m_lastIMUTime   = frc::Timer::GetFPGATimestamp();
+    // Zero all yaw integrators – must happen before CalibrateGyroZBias
+    m_yaw_rad          = 0.0;
+    m_thetaRad         = 0.0;
+    m_lastGyroZ_radps  = 0.0;
+    m_lastIMUTime      = frc::Timer::GetFPGATimestamp();
 
     // Calibrate gyro bias (robot must be stationary for ~1 second)
     CalibrateGyroZBias();
 
-    // Zero the radian-based heading used by PID
-    m_thetaRad    = 0.0;
+    // m_thetaRad is already zeroed above; reset the PID first-loop flag
     m_firstPidLoop = true;
 
     // Load the setpoint sequence for the PID approach phase
@@ -545,18 +544,11 @@ void Robot::AutonomousPeriodic() {
     m_prevTime = now;
     if (dt <= 1e-4 || dt > 0.1) dt = 0.02; // fallback for stalls / big gaps
 
-    // ── 4. Integrate bias-corrected gyro-Z in radians ─────────────────────
-    double gz_radps = 0.0;
-    bool   imuOk    = ReadIMURadps(gz_radps);
-    double omega_z  = gz_radps - m_gyroZBiasRadps;
-    m_thetaRad     += omega_z * dt;
-    m_thetaRad      = WrapAngle(m_thetaRad);
-
-    frc::SmartDashboard::PutBoolean("IMU/ReadOK",        imuOk);
-    frc::SmartDashboard::PutNumber ("IMU/GyroZ_radps",   gz_radps);
-    frc::SmartDashboard::PutNumber ("IMU/Bias_radps",    m_gyroZBiasRadps);
-    frc::SmartDashboard::PutNumber ("IMU/OmegaZ_radps",  omega_z);
-    frc::SmartDashboard::PutNumber ("IMU/Theta_rad",     m_thetaRad);
+    // ── 4. Heading is already current – IMUUpdate() ran in RobotPeriodic() ──
+    // m_thetaRad is the bias-corrected radian heading maintained by IMUUpdate().
+    // No second I2C read needed here.
+    frc::SmartDashboard::PutNumber("IMU/Theta_rad",    m_thetaRad);
+    frc::SmartDashboard::PutNumber("IMU/Bias_radps",   m_gyroZBiasRadps);
 
     // ── 5. Compute encoder-based pose (metres) ────────────────────────────
     // Wheel diameter 72 mm; encoder PPR from BOM:
