@@ -171,7 +171,7 @@ class Robot : public frc::TimesliceRobot {
   //   2. Read "Vision/Primary X" from SmartDashboard.
   //   3. Average 5–10 readings and set that value here.
   //
-  static constexpr double kCameraCenter_px = 750.0;
+  static constexpr double kCameraCenter_px = 740.0;
  
   // How far off-center (pixels) before we apply a lateral correction.
   static constexpr double kCenterTolerance_px = 40.0;
@@ -181,7 +181,7 @@ class Robot : public frc::TimesliceRobot {
   // Start at 0.3 and tune upward if the robot fails to track a laterally
   // offset tag, or downward if it oscillates.
   //   If the robot isn't correcting enough, increase it. If it oscillates side to side, decrease it.
-  static constexpr double kSteerFactor = 0.3;
+  static constexpr double kSteerFactor = 0.2;
  
   // ── NetworkTables publishers ─────────────────────────────────────────────
   // Vision/task_done   → Pi reads this to know the robot has arrived.
