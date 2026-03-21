@@ -171,11 +171,7 @@ class Robot : public frc::TimesliceRobot {
   //   2. Read "Vision/Primary X" from SmartDashboard.
   //   3. Average 5–10 readings and set that value here.
   //
-  // Starting estimate: 740 (true geometric centre of a 1480 px wide frame).
-  // Adjust after measurement. A rightward camera offset typically produces a
-  // value LESS than 740 (the tag appears left of the frame centre when
-  // the robot is pointed straight at it).
-  static constexpr double kCameraCenter_px = 650.0;
+  static constexpr double kCameraCenter_px = 750.0;
  
   // How far off-center (pixels) before we apply a lateral correction.
   static constexpr double kCenterTolerance_px = 40.0;
