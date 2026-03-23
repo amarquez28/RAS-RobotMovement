@@ -392,76 +392,12 @@ double Robot::WrapAngle(double angle) {
     return angle;
 }
 
-// ── Teammate's RAS 2026 competition path ─────────────────────────────────────
-// Each waypoint is {x_m, y_m, theta_rad} in field-relative coordinates.
-// x is forward/backward (positive = forward), y is lateral (negative = left),
-// theta is heading in radians (0 = forward, π = reversed, positive = CCW).
-//
-// Sequence summary:
-//   1.  Drive forward 38 cm.
-//   2–5. Smooth 360° spin in place (four intermediate heading waypoints).
-//   6.  Drive forward 63 cm (total x = 1.01 m).
-//   7.  Reverse 30 cm (x = 0.71 m).
-//   8.  180° in-place turn to face rearward (theta = π).
-//   9.  Reverse 30 cm and drop beacon (x = 0.41 m).
-//   10–26. Boustrophedon sweep of the field in 3-cm-wide strips.
-//   27. Deposit run (move left 83 cm to x = 0.52, y = −0.595).
-//   28. Partial recovery (move right 44 cm, y = −0.155).
-//   29. Final 180 cm forward run to exit zone (x = 2.32 m).
-//
-// NOTE: Waypoint 5→6 transitions heading from π/2 back to 0 without an
-// explicit intermediate. The PID handles it but watch for oscillation;
-// add a dedicated spin waypoint here if the robot spins erratically.
-//
-// M_PI replaced with std::numbers::pi for C++20 / WPILib toolchain safety.
-// ─────────────────────────────────────────────────────────────────────────────
 void Robot::LoadAutonomousSetpoints() {
-    constexpr double pi   = std::numbers::pi;
-    constexpr double pi_2 = std::numbers::pi / 2.0;
-
-    m_setpoints = {
-        // ── Phase 1: Initial advance ──────────────────────────────────────
-        {0.38,  0.0,    0.0 },   // [0]  Move forward 38 cm
-
-        // ── Phase 2: Smooth 360° spin ─────────────────────────────────────
-        {0.38,  0.0,    pi_2},   // [1]  Begin spin  (face left  90°)
-        {0.38,  0.0,    pi },    // [2]  Continue    (face rearward 180°)
-        {0.38,  0.0,   -pi_2},   // [3]  Continue    (face right 270°)
-        {0.38,  0.0,    pi_2},   // [4]  Complete    (face left again – see NOTE above)
-
-        // ── Phase 3: Forward run, reverse, 180° turn, drop beacon ─────────
-        {1.01,  0.0,    0.0 },   // [5]  Move forward 63 cm
-        {0.71,  0.0,    0.0 },   // [6]  Reverse 30 cm
-        {0.71,  0.0,    pi  },   // [7]  180° in-place turn
-        {0.41,  0.0,    pi  },   // [8]  Reverse 30 cm; DROP BEACON here
-
-        // ── Phase 4: Boustrophedon sweep ──────────────────────────────────
-        {0.41, -0.415,  pi  },   // [9]  Strafe left 41.5 cm
-        {0.64, -0.415,  pi  },   // [10] Forward 23 cm
-        {0.41, -0.415,  pi  },   // [11] Reverse 23 cm
-        {0.41, -0.245,  pi  },   // [12] Strafe right 17 cm
-        {1.03, -0.245,  pi  },   // [13] Forward 62 cm
-        {1.03, -0.435,  pi  },   // [14] Strafe left 19 cm
-        {1.35, -0.435,  pi  },   // [15] Forward 32 cm
-        {0.42, -0.435,  pi  },   // [16] Reverse 93 cm
-        {0.42, -0.245,  pi  },   // [17] Strafe right 19 cm
-        {1.36, -0.245,  pi  },   // [18] Forward 94 cm
-        {0.42, -0.245,  pi  },   // [19] Reverse 94 cm
-        {0.42,  0.005,  pi  },   // [20] Strafe right 25 cm
-        {1.35,  0.005,  pi  },   // [21] Forward 93 cm
-        {0.42,  0.005,  pi  },   // [22] Reverse 93 cm
-        {0.42,  0.235,  pi  },   // [23] Strafe right 23 cm
-        {1.20,  0.235,  pi  },   // [24] Forward 78 cm
-        {0.52,  0.235,  pi  },   // [25] Reverse 68 cm
-
-        // ── Phase 5: Deposit and exit ─────────────────────────────────────
-        {0.52, -0.595,  pi  },   // [26] Strafe left 83 cm; DEPOSIT
-        {0.52, -0.155,  pi  },   // [27] Strafe right 44 cm
-        {2.32, -0.155,  pi  },   // [28] Forward 180 cm – EXIT ZONE
-    };
-
+    int tag_id = 1;
+    // int tag_id = m_aprilTagReader.GetPrimaryTag().id;
+    m_setpoints = AutonomousPaths::GetPath(tag_id);
     m_currentSetpointIndex = 0;
-    m_autoComplete         = m_setpoints.empty();
+    m_autoComplete = m_setpoints.empty();
 }
 
 void Robot::AdvanceToNextSetpoint() {
@@ -679,6 +615,7 @@ void Robot::AutonomousPeriodic() {
 
     // ── APPROACH: PID-controlled drive toward tag ─────────────────────────
     case AutoPhase::APPROACH:
+    /*
         // Safety: tag lost mid-approach → stop and re-search
         if (!hasTag) {
             StopAllDrive();
@@ -686,7 +623,7 @@ void Robot::AutonomousPeriodic() {
             frc::SmartDashboard::PutString("Auto/Phase", "Search (tag lost)");
             break;
         }
-
+    */
         // Stop condition
         if (tag.distance <= kStopDistance_m) {
             StopAllDrive();

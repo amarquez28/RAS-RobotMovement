@@ -22,6 +22,7 @@
 #include "AprilTagReader.h"
 #include "SweepController.h"
 #include <vector>
+#include <AutonomousPaths.h>
 
 // ── Autonomous phase ─────────────────────────────────────────────────────────
 // SEARCH  : No tag visible yet – robot holds position and waits.
@@ -144,13 +145,6 @@ class Robot : public frc::TimesliceRobot {
   units::second_t m_prevTime   = 0_s;
   bool m_firstPidLoop = true;
 
-    //Setpoint declaration
-  struct Setpoint {
-    double x_trgt;
-    double y_trgt;
-    double theta_rad_trgt;
-  };
-
   std::vector<Setpoint> m_setpoints;
   size_t m_currentSetpointIndex = 0;
   bool m_autoComplete = false; 
@@ -202,7 +196,7 @@ class Robot : public frc::TimesliceRobot {
   // ── Tag-approach autonomous phase ───────────────────────────────────────
   // The robot waits for a tag, then drives straight toward it until
   
-  AutoPhase m_autoPhase = AutoPhase::SEARCH;
+  AutoPhase m_autoPhase = AutoPhase::APPROACH;
   bool m_taskDone = false;
 
   //stopping distance from the tag (meters)
