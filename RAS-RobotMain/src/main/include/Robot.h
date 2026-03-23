@@ -11,15 +11,18 @@
 #include <frc/PWM.h>
 #include <frc/DigitalOutput.h>
 #include <frc/Timer.h>
+#include <units/time.h>
 #include <frc/Encoder.h>
 #include <frc/controller/PIDController.h>
 #include "rev/ServoHub.h"
 #include <frc/AnalogInput.h>
 #include <frc/DigitalInput.h>
-#include <frc/SerialPort.h>
+#include <frc/SerialPort.h> //UART communication with Roboclaw
 #include <frc/I2C.h>
 #include "AprilTagReader.h"
 #include "SweepController.h"
+#include <vector>
+#include <AutonomousPaths.h>
 
 // ── Autonomous phase ─────────────────────────────────────────────────────────
 // SEARCH  : No tag visible yet – robot holds position and waits.
@@ -91,6 +94,18 @@ class Robot : public frc::TimesliceRobot {
   bool RoboClawReadEncoder  (uint8_t addr, uint8_t cmd, int32_t& count, uint8_t& status);
   bool RoboClawReadEncoderM1(uint8_t addr, int32_t& count, uint8_t& status);
   bool RoboClawReadEncoderM2(uint8_t addr, int32_t& count, uint8_t& status);
+  //Encoder reset
+  void RoboClawResetEncoder(uint8_t addr);
+  void RoboClawResetAllEncoders();
+  //Wrap Angle for Theta controller
+  double WrapAngle(double angle);
+  //IMU Calibration before starting the program
+  void CalibrateGyroZBias();
+  void UpdateIMUTheta();
+  //Setpoint Helpers
+  void LoadAutonomousSetpoints();
+  void AdvanceToNextSetpoint();
+  void ResetPidState();
 
   // ── Hall sensor ─────────────────────────────────────────────────────────
   frc::AnalogInput  m_hallAnalog{0};   // AI0
@@ -100,31 +115,65 @@ class Robot : public frc::TimesliceRobot {
   static constexpr int kServoHubId = 20;
   rev::servohub::ServoHub m_servoHub{kServoHubId};
 
-  rev::servohub::ServoChannel& m_servo0{
-      m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId0)};
-  rev::servohub::ServoChannel& m_servo1{
-      m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId1)};
-  rev::servohub::ServoChannel& m_servo2{
-      m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};
-  rev::servohub::ServoChannel& m_servo3{
-      m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId3)};
+  rev::servohub::ServoChannel& m_servoBrush{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId0)};//brush
+  rev::servohub::ServoChannel &m_servoRelease{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId4)};//release orbs door
+  rev::servohub::ServoChannel &m_servoHall{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};//hall sensor
+  rev::servohub::ServoChannel &m_servoArm{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId5)};//arm
+
+  // PID Tuning gains
+  double x_kP = 91.0;
+  double x_kI = 8.0;
+  double x_kD = 5.0;
+  double y_kP = 160.0;
+  double y_kI = 0.0;
+  double y_kD = 0.5;
+  double theta_kI = 5.0;
+  double theta_kD = 0.5;
+  // Forward/Backward wheel PID state
+  double x_integral = 0.0;
+  double x_prevError = 0.0;
+  // Strafe wheel PID state
+  double y_integral = 0.0;
+  double y_prevError = 0.0;
+  // Theta PID state
+  double theta_integral  = 0.0;
+  double theta_prevError = 0.0;
+  // Gyro bias (rad/s) – measured during CalibrateGyroZBias() in AutonomousInit
+  double m_gyroZBiasRadps = 0.0;
+
+  // Time tracking for PID dt
+  units::second_t m_prevTime   = 0_s;
+  bool m_firstPidLoop = true;
+
+  std::vector<Setpoint> m_setpoints;
+  size_t m_currentSetpointIndex = 0;
+  bool m_autoComplete = false; 
 
   // Servo pulse widths (microseconds)
-  static constexpr int kHallServoInitPos = 500;   // Closed
-  static constexpr int kHallServoOpenPos = 1500;  // Open
+  static constexpr int kHallServoInitPos    = 500;   // Closed
+  static constexpr int kHallServoOpenPos    = 1500;  // Open
+  static constexpr int BrushServoInitPos    = 500;
+  static constexpr int BrushServoOpenPos    = 1500;
+  static constexpr int ArmServoInitPos      = 500;
+  static constexpr int ArmServoOpenPos      = 1500;
+  static constexpr int ReleaseServoInitPos  = 500;
+  static constexpr int ReleaseServoOpenPos  = 1500;
 
   // ── IMU (MPU-6050 on I²C onboard port, addr 0x68) ──────────────────────
   frc::I2C m_imu{frc::I2C::Port::kOnboard, 0x68};
 
-  bool  IMUWriteReg (uint8_t reg, uint8_t data);
-  bool  IMUReadRegs (uint8_t startReg, uint8_t* out, int len);
-  void  IMUInit     ();
-  void  IMUUpdate   ();   // Integrates gyro Z → m_yaw_deg
-  void  IMUDashboard();   // Pushes raw + converted values to SmartDashboard
+  bool  IMUWriteReg  (uint8_t reg, uint8_t data);
+  bool  IMUReadRegs  (uint8_t startReg, uint8_t* out, int len);
+  void  IMUInit      ();
+  void  IMUUpdate    ();   // Single I2C read per tick; integrates gyro-Z → m_thetaRad
+  void  IMUDashboard ();   // Pushes raw + converted values to SmartDashboard
 
-  // Integrated yaw (degrees). Positive = counter-clockwise when viewed from top.
-  double          m_yaw_deg       = 0.0;
-  double          m_lastGyroZ_dps = 0.0;
+  // Integrated yaw in radians. Updated by IMUUpdate() every RobotPeriodic() tick.
+  // m_thetaRad is the bias-corrected heading used by the PID controller.
+  // m_yaw_rad  is the un-corrected heading used by sweep / dashboard.
+  double          m_thetaRad         = 0.0;  // bias-corrected, PID heading
+  double          m_yaw_rad          = 0.0;  // raw integrated yaw (dashboard/sweep)
+  double          m_lastGyroZ_radps  = 0.0;  // previous sample for trapezoidal integration
   units::second_t m_lastIMUTime{0};
 
   // ── Encoder snapshot used by sweep ─────────────────────────────────────
