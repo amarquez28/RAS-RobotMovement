@@ -196,7 +196,7 @@ class Robot : public frc::TimesliceRobot {
   // ── Tag-approach autonomous phase ───────────────────────────────────────
   // The robot waits for a tag, then drives straight toward it until
   
-  AutoPhase m_autoPhase = AutoPhase::APPROACH;
+  AutoPhase m_autoPhase = AutoPhase::SEARCH;
   bool m_taskDone = false;
 
   //stopping distance from the tag (meters)

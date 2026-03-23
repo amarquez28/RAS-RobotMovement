@@ -477,7 +477,7 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine
-    m_autoPhase = AutoPhase::SEARCH;
+    m_autoPhase = AutoPhase::APPROACH;
     m_taskDone  = false;
 
     // Clear NT completion flags so the Pi sees the reset
