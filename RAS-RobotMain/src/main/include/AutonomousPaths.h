@@ -93,10 +93,8 @@ namespace AutonomousPaths {
 
 
 // ============================================================================
-//  Path 0  –  DEFAULT / FALLBACK
-//  Used when no AprilTag is detected at autonomous start.
-//  Safe minimal motion: drive forward to mid-field, stop.
-//  Tune this first to verify basic PID → encoder dead-reckoning behaviour.
+//  Path 0  –  DEFAULT 
+//  We will use this path up until we need to scan the april tag to move the bins in the correct place
 // ============================================================================
 static std::vector<Setpoint> Path_Default() {
     using namespace PathConst;

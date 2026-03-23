@@ -56,6 +56,11 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
     m_servoHall.SetPowered(true);    m_servoHall.SetEnabled(true);
     m_servoArm.SetPowered(true);     m_servoArm.SetEnabled(true);
 
+    m_servoBrush.SetPulseWidth(BrushServoInitPos);
+    m_servoRelease.SetPulseWidth(ReleaseServoInitPos);
+    m_servoHall.SetPulseWidth(kHallServoInitPos);
+    m_servoArm.SetPulseWidth(ArmServoInitPos);
+
     // Initialise IMU
     IMUInit();
 
@@ -393,7 +398,7 @@ double Robot::WrapAngle(double angle) {
 }
 
 void Robot::LoadAutonomousSetpoints() {
-    int tag_id = 1;
+    int tag_id = 0;
     // int tag_id = m_aprilTagReader.GetPrimaryTag().id;
     m_setpoints = AutonomousPaths::GetPath(tag_id);
     m_currentSetpointIndex = 0;
@@ -647,12 +652,14 @@ void Robot::AutonomousPeriodic() {
                 x_target     = sp.x_trgt;
                 y_target     = sp.y_trgt;
                 theta_target = sp.theta_rad_trgt;
-            } else {
-                // Simple fallback: drive forward by tag distance, hold current y/theta
-                x_target     = x_pos + tag.distance;
-                y_target     = y_pos;
-                theta_target = m_thetaRad;
             }
+            //uncomment when we bring back april tag detection
+            // } else {
+            //     // Simple fallback: drive forward by tag distance, hold current y/theta
+            //     x_target     = x_pos + tag.distance;
+            //     y_target     = y_pos;
+            //     theta_target = m_thetaRad;
+            // }
 
             double x_error     = x_target - x_pos;
             double y_error     = y_target - y_pos;
