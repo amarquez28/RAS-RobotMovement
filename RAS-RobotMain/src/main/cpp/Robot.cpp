@@ -431,11 +431,11 @@ void Robot::RobotPeriodic() {
     m_aprilTagReader.UpdateDashboard();
 
     // Hall sensor → hatch door servo
-    if (!m_hallDigital.Get()) {
-        m_servoHall.SetPulseWidth(kHallServoOpenPos);
-    } else {
-        m_servoHall.SetPulseWidth(kHallServoInitPos);
-    }
+    // if (!m_hallDigital.Get()) {
+        // m_servoHall.SetPulseWidth(kHallServoOpenPos);
+    // } else {
+    //     m_servoHall.SetPulseWidth(kHallServoInitPos);
+    // }
 
     // Dashboard: hall sensor
     frc::SmartDashboard::PutNumber ("Hall/Voltage_V", m_hallAnalog.GetVoltage());
@@ -494,7 +494,7 @@ void Robot::AutonomousInit() {
     m_horizTicks = 0;
 
     // Close hatch door
-    m_servoHall.SetPulseWidth(kHallServoInitPos);
+    // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
     // Safety stop
     RoboClawStopAll();
