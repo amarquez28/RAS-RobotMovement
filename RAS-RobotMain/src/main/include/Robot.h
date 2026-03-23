@@ -220,7 +220,7 @@ class Robot : public frc::TimesliceRobot {
   //   2. Read "Vision/Primary X" from SmartDashboard.
   //   3. Average 5–10 readings and set that value here.
   //
-  static constexpr double kCameraCenter_px = 740.0;
+  static constexpr double kCameraCenter_px = 528.0;
  
   // How far off-center (pixels) before we apply a lateral correction.
   static constexpr double kCenterTolerance_px = 40.0;
