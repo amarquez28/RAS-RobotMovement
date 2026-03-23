@@ -625,15 +625,15 @@ void Robot::AutonomousPeriodic() {
         }
     */
         // Stop condition
-        if (tag.distance <= kStopDistance_m) {
-            StopAllDrive();
-            m_taskDonePub.Set(true);
-            m_sweepDonePub.Set(true); // legacy key for Pi compatibility
-            m_taskDone  = true;
-            m_autoPhase = AutoPhase::DONE;
-            frc::SmartDashboard::PutString("Auto/Phase", "Done");
-            break;
-        }
+        // if (tag.distance <= kStopDistance_m) {
+        //     StopAllDrive();
+        //     m_taskDonePub.Set(true);
+        //     m_sweepDonePub.Set(true); // legacy key for Pi compatibility
+        //     m_taskDone  = true;
+        //     m_autoPhase = AutoPhase::DONE;
+        //     frc::SmartDashboard::PutString("Auto/Phase", "Done");
+        //     break;
+        // }
 
         // ── PID computation ───────────────────────────────────────────────
         // Setpoint: drive x forward by tag.distance, hold y, hold heading.
