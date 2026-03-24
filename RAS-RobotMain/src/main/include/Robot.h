@@ -247,7 +247,7 @@ class Robot : public frc::TimesliceRobot {
   void ActuatorStop   ();
 
   static constexpr uint8_t kActuatorSpeed     = 80;   // TODO: tune – 0-127
-  static constexpr double  kActuatorRunTime_s = 2.0;  // TODO: tune – seconds to full extend/retract
+  static constexpr double  kActuatorRunTime_s = 7.0;  // TODO: tune – seconds to full extend/retract
   bool m_actuatorExtended = false;
 
   // ── Bucket / beacon mechanisms ───────────────────────────────────────────
