@@ -835,22 +835,12 @@ void Robot::GrabBucket() {
 }
 
 // DepositBeacon – move m_servoArm to drop the beacon, then extend the
-// linear actuator to push all ores out of the bucket.
-//
-// NOTE: This function starts the actuator but does NOT block.
-//       The caller must track time and call ActuatorStop() after
-//       kActuatorRunTime_s, then ActuatorRetract() / ActuatorStop() to home.
 // TODO: confirm kArmServoBeaconPos angle.
-// TODO: confirm kActuatorRunTime_s is long enough for full extension.
 void Robot::DepositBeacon() {
     // 1. Drop beacon from arm
     m_servoArm.SetPulseWidth(kArmServoBeaconPos);
     std::cout << "[Mechanism] DepositBeacon — arm to beacon pos (" << kArmServoBeaconPos << " μs)\n";
 
-    // 2. Start pushing ores out
-    ActuatorExtend(kActuatorSpeed);
-    m_actuatorExtended = true;
-    std::cout << "[Mechanism] DepositBeacon — actuator extending at speed " << (int)kActuatorSpeed << "\n";
 }
 
 // ============================================================================
