@@ -485,6 +485,11 @@ void Robot::AutonomousInit() {
     m_autoPhase = AutoPhase::TEST;
     m_taskDone  = false;
 
+    // Reset test sequencer
+    m_testStep = 0;
+    m_timer.Reset();
+    m_timer.Start();
+
     // Clear NT completion flags so the Pi sees the reset
     m_taskDonePub.Set(false);
     m_sweepDonePub.Set(false);
@@ -596,46 +601,24 @@ void Robot::AutonomousPeriodic() {
     switch (m_autoPhase)
     {
     //test mode for headless setup 
-    case AutoPhase::TEST:
-        // Init resets the step counter and starts the timer so TestPeriodic
-        // can sequence through servo and actuator checks automatically.
-        m_testStep = 0;
-        m_timer.Reset();
-        m_timer.Start();
-        std::cout << "[Test] TestInit — servo + actuator test sequence starting\n";
-
-        // Test sequences:
+    case AutoPhase::TEST: {
+        // Test sequences (m_testStep + m_timer reset in AutonomousInit):
         //   0-1 s  : servo grab
         //   1-2 s  : servo release
-        //   2+ s   : actuator extend → stop → retract → stop (driven by m_testStep)
+        //   2+ s   : actuator extend → stop → retract → stop
         double elapsed = m_timer.Get().value();
 
-        if (elapsed < 1.0)
-        {
-            // Phase 1: move arm to grab position
+        if (elapsed < 1.0) {
             static bool grabSent = false;
-            if (!grabSent)
-            {
-                TestServo();
-                grabSent = true;
-            }
-        }
-        else if (elapsed < 2.0)
-        {
-            // Phase 2: move arm to release position
+            if (!grabSent) { TestServo(); grabSent = true; }
+        } else if (elapsed < 2.0) {
             static bool releaseSent = false;
-            if (!releaseSent)
-            {
-                TestServo();
-                releaseSent = true;
-            }
-        }
-        else
-        {
-            // Phase 3: actuator cycle (state machine in TestActuator)
+            if (!releaseSent) { TestServo(); releaseSent = true; }
+        } else {
             TestActuator();
         }
         break;
+    }
 
     // ── DONE: hold position ───────────────────────────────────────────────
     case AutoPhase::DONE:
