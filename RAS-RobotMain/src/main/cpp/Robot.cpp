@@ -896,6 +896,15 @@ void Robot::TestActuator() {
                 m_testStep = 4;
             }
             break;
+        case 4:
+            ActuatorRetract(kActuatorSpeed);
+            m_timer.Reset();
+            m_testStep = 5;
+            break;
+        case 5:
+            if(elapsed >= kActuatorRunTime_s){
+                ActuatorStop();
+            }
         default:
             break; // test complete
     }
