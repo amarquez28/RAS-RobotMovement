@@ -155,7 +155,7 @@ class Robot : public frc::TimesliceRobot {
   static constexpr int BrushServoInitPos    = 500;
   static constexpr int BrushServoOpenPos    = 1500;
   static constexpr int ArmServoInitPos      = 500;
-  static constexpr int ArmServoOpenPos      = 1500;
+  static constexpr int ArmServoOpenPos      = 1200;
   static constexpr int ReleaseServoInitPos  = 500;
   static constexpr int ReleaseServoOpenPos  = 1500;
 
@@ -220,7 +220,7 @@ class Robot : public frc::TimesliceRobot {
   //   2. Read "Vision/Primary X" from SmartDashboard.
   //   3. Average 5–10 readings and set that value here.
   //
-  static constexpr double kCameraCenter_px = 740.0;
+  static constexpr double kCameraCenter_px = 528.0;
  
   // How far off-center (pixels) before we apply a lateral correction.
   static constexpr double kCenterTolerance_px = 40.0;
@@ -237,4 +237,33 @@ class Robot : public frc::TimesliceRobot {
   // Vision/sweep_done  → Legacy sweep-completion signal (kept for compatibility).
   nt::BooleanPublisher m_taskDonePub;
   nt::BooleanPublisher m_sweepDonePub;
+
+  // ── Linear actuator (RoboClaw 0x81, M2) ─────────────────────────────────
+  // Electrical confirmed: plugged into the M2 terminals on the same controller
+  // as the strafe motor (M1). Extend pushes the ore deposit plate forward.
+  void ActuatorExtend (uint8_t speed);
+  void ActuatorRetract(uint8_t speed);
+  void ActuatorStop   ();
+
+  static constexpr uint8_t kActuatorSpeed     = 126;   // TODO: tune – 0-127
+  static constexpr double  kActuatorRunTime_s = 5.0;  // TODO: tune – seconds to full extend/retract
+  bool m_actuatorExtended = false;
+
+  // ── Bucket / beacon mechanisms ───────────────────────────────────────────
+  // Only m_servoArm is used in the non-sorting system.
+  void GrabBucket   ();  // Raise arm then clamp onto collection bucket
+  void DepositBeacon();  // Raise arm to beacon-drop angle; beacon detaches
+  void DepositOres  ();  // Extend actuator at full speed to push all ores out
+
+  // TODO: measure and set these pulse widths on real hardware (μs, 500–2500)
+  static constexpr int kArmServoGrabPos   = 500;  // TODO: closed/clamped position
+  static constexpr int kArmServoDropPos   = 1200; // TODO: open/release position
+  static constexpr int kArmServoBeaconPos = 1000; // TODO: beacon-deposit angle (may equal drop)
+
+  // ── Test routines ────────────────────────────────────────────────────────
+  // Call from TestInit()/TestPeriodic() to verify hardware before a match.
+  void TestServo   ();  // Sweeps arm servo: grab → wait → release
+  void TestActuator();  // Extends actuator → waits → retracts
+
+  int m_testStep = 0;   // Step counter used by TestPeriodic() sequencer
 };

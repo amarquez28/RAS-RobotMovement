@@ -482,8 +482,13 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine
-    m_autoPhase = AutoPhase::APPROACH;
+    m_autoPhase = AutoPhase::SEARCH;
     m_taskDone  = false;
+
+    // Reset test sequencer
+    m_testStep = 0;
+    m_timer.Reset();
+    m_timer.Start();
 
     // Clear NT completion flags so the Pi sees the reset
     m_taskDonePub.Set(false);
@@ -620,26 +625,6 @@ void Robot::AutonomousPeriodic() {
 
     // ── APPROACH: PID-controlled drive toward tag ─────────────────────────
     case AutoPhase::APPROACH:
-    /*
-        // Safety: tag lost mid-approach → stop and re-search
-        if (!hasTag) {
-            StopAllDrive();
-            m_autoPhase = AutoPhase::SEARCH;
-            frc::SmartDashboard::PutString("Auto/Phase", "Search (tag lost)");
-            break;
-        }
-    */
-        // Stop condition
-        // if (tag.distance <= kStopDistance_m) {
-        //     StopAllDrive();
-        //     m_taskDonePub.Set(true);
-        //     m_sweepDonePub.Set(true); // legacy key for Pi compatibility
-        //     m_taskDone  = true;
-        //     m_autoPhase = AutoPhase::DONE;
-        //     frc::SmartDashboard::PutString("Auto/Phase", "Done");
-        //     break;
-        // }
-
         // ── PID computation ───────────────────────────────────────────────
         // Setpoint: drive x forward by tag.distance, hold y, hold heading.
         // The tag distance is the live "how far until we stop" signal.
@@ -780,6 +765,60 @@ void Robot::AutonomousPeriodic() {
 }
 
 // ============================================================================
+//  Linear actuator helpers  (RoboClaw 0x81, M2)
+// ============================================================================
+
+// Extends the ore-deposit plate forward.
+void Robot::ActuatorExtend(uint8_t speed) {
+    RoboClawM2Forward(kRoboClawAddr_Strafe, speed);
+}
+
+// Retracts the ore-deposit plate back.
+void Robot::ActuatorRetract(uint8_t speed) {
+    RoboClawM2Backward(kRoboClawAddr_Strafe, speed);
+}
+
+// Stops the actuator in place.
+void Robot::ActuatorStop() {
+    RoboClawM2Forward(kRoboClawAddr_Strafe, 0);
+}
+
+// ============================================================================
+//  Bucket / beacon / ore mechanisms
+// ============================================================================
+
+// GrabBucket – raise the arm to clear the bucket lip, then lower back to the
+// init/clamped position to lock onto the bucket.
+// The path is responsible for waiting between these two steps:
+//   1. Call GrabBucket() → arm raises to ArmServoOpenPos (1200 μs)
+//   2. Wait ~1 s for servo to travel
+//   3. Call GrabBucket() again → arm lowers to ArmServoInitPos (500 μs)
+void Robot::GrabBucket() {
+    static bool raised = false;
+    raised = !raised;
+    int pw = raised ? ArmServoOpenPos : ArmServoInitPos;
+    m_servoArm.SetPulseWidth(pw);
+}
+
+// DepositBeacon – raise the arm to the beacon-drop angle so the beacon
+// detaches and falls into the goal zone.
+// TODO: tune kArmServoBeaconPos (currently 1000 μs) for the right release angle.
+void Robot::DepositBeacon() {
+    m_servoArm.SetPulseWidth(kArmServoBeaconPos);
+}
+
+// DepositOres – extend the linear actuator at full speed for kActuatorRunTime_s
+// to push all ores out of the bucket.
+// Non-blocking: starts the actuator and sets m_actuatorExtended = true.
+// The path must call ActuatorStop() after kActuatorRunTime_s (5 s),
+// then ActuatorRetract() + ActuatorStop() to home the plate.
+void Robot::DepositOres() {
+    ActuatorExtend(kActuatorSpeed);
+    m_actuatorExtended = true;
+    std::cout << "[Mechanism] DepositOres — actuator extending at speed " << (int)kActuatorSpeed << "\n";
+}
+
+// ============================================================================
 //  TeleopInit / TeleopPeriodic
 // ============================================================================
 
@@ -801,9 +840,15 @@ void Robot::DisabledInit() {
 
 void Robot::DisabledPeriodic() {}
 
-void Robot::TestInit() {}
 
-void Robot::TestPeriodic() {}
+void Robot::TestInit() {
+
+}
+
+
+void Robot::TestPeriodic() {
+   
+}
 
 void Robot::SimulationPeriodic() {}
 
