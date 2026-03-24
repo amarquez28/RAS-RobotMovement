@@ -93,24 +93,7 @@ namespace AutonomousPaths {
 
 
 // ============================================================================
-//  Path 0  –  DEFAULT
-//  We will use this path up until we need to scan the april tag to move the
-//  bins in the correct place
-// ============================================================================
-static std::vector<Setpoint> Path_Default() {
-    using namespace PathConst;
-    return {
-        // ── Phase 1: Advance to mid-field ────────────────────────────────────
-        { 0.60,  0.0,  0.0 },   // [0] Drive forward 60 cm (≈ half field)
-
-        // ── Phase 2: Hold position ────────────────────────────────────────────
-        // Add further waypoints here once basic motion is verified.
-    };
-}
-
-
-// ============================================================================
-//  Path 1  –  TAG ID 1  |  FULL COMPETITION PATH  (RAS 2026 field sweep)
+//  Path Default  –  DEFAULT  |  FULL COMPETITION PATH  (RAS 2026 field sweep)
 //
 //  Sequence overview:
 //    1.  Drive forward 54 cm.
@@ -129,7 +112,7 @@ static std::vector<Setpoint> Path_Default() {
 //  All coordinates in metres (original waypoints ÷ 100).
 //  Theta expressed as multiples of pi (C++20 std::numbers::pi via PathConst).
 // ============================================================================
-static std::vector<Setpoint> Path_1() {
+static std::vector<Setpoint> Path_Default() {
     using namespace PathConst;
     return {
         // ── Start ─────────────────────────────────────────────────────────────
@@ -204,15 +187,30 @@ static std::vector<Setpoint> Path_1() {
         { 2.48, -0.19, -pi_2          },  // [54] right 5 cm        (y motor)
         { 2.48, -0.19, -pi            },  // [55] turn right 90°
         { 4.28, -0.19, -pi            },  // [56] forward 180 cm    ← exit cave
-        { 4.28, -0.19,  0.0           },  // [66] 180° turn (now facing +x)
-        { 5.28, -0.19,  0.0           },  // [67] forward 100 cm     (+x)
-        { 5.28, -0.19, -pi_2          },  // [68] turn right 90°
-        { 5.03, -0.19, -pi_2          },  // [69] reverse 25 cm      (-x) //grab bucket
-        { 5.28, -0.19, -pi_2          },  // [70] forward 25 cm      (+x)
-        { 5.28,  0.21, -pi_2          },  // [71] strafe right 40 cm (+y)
-        { 5.28,  0.21, -pi            },  // [72] turn right 90°
-        { 5.28, -0.22, -pi            },  // [73] left strafe 43 cm  (-y)
-        { 4.98, -0.22, -pi            },  // [74] reverse 30 cm      (-x)
+        { 4.28, -0.19,  0.0           },  // [57] 180° turn (now facing +x)
+        { 5.28, -0.19,  0.0           },  // [58] forward 100 cm     (+x)
+        { 5.28, -0.19, -pi_2          },  // [59] turn right 90°
+        { 5.03, -0.19, -pi_2          },  // [60] reverse 25 cm      (-x) //grab bucket
+        { 5.28, -0.19, -pi_2          },  // [61] forward 25 cm      (+x)
+        { 5.28,  0.21, -pi_2          },  // [62] strafe right 40 cm (+y)
+        { 5.28,  0.21, -pi            },  // [63] turn right 90°
+        { 5.28, -0.22, -pi            },  // [64] left strafe 43 cm  (-y)
+        { 4.98, -0.22, -pi            },  // [65] reverse 30 cm      (-x)
+    };
+}
+
+
+// ============================================================================
+//  Path 1  –  TAG ID 1  |  PLACEHOLDER
+//  Replace this stub with your actual Path 1 waypoints.
+//  Strategy notes:
+//    - ...
+// ============================================================================
+static std::vector<Setpoint> Path_1() {
+    using namespace PathConst;
+    return {
+        // ── TODO: Define Path 1 waypoints ────────────────────────────────────
+        { 0.0,  0.0,  0.0 },   // [0] Placeholder — robot holds start position
     };
 }
 
@@ -268,7 +266,7 @@ static std::vector<Setpoint> Path_4() {
 //
 //  Tag ID → Path mapping:
 //    0      : Default / no tag detected → Path_Default()
-//    1      : Full competition path     → Path_1()
+//    1      : Path 1 (TBD)             → Path_1()
 //    2      : Path 2 (TBD)             → Path_2()
 //    3      : Path 3 (TBD)             → Path_3()
 //    4      : Path 4 (TBD)             → Path_4()
