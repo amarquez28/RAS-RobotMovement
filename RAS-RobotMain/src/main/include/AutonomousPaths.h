@@ -93,8 +93,9 @@ namespace AutonomousPaths {
 
 
 // ============================================================================
-//  Path 0  –  DEFAULT 
-//  We will use this path up until we need to scan the april tag to move the bins in the correct place
+//  Path 0  –  DEFAULT
+//  We will use this path up until we need to scan the april tag to move the
+//  bins in the correct place
 // ============================================================================
 static std::vector<Setpoint> Path_Default() {
     using namespace PathConst;
@@ -109,73 +110,100 @@ static std::vector<Setpoint> Path_Default() {
 
 
 // ============================================================================
-//  Path 1  –  TAG ID 1  |  FULL COMPETITION PATH  (original strategy)
+//  Path 1  –  TAG ID 1  |  FULL COMPETITION PATH  (RAS 2026 field sweep)
 //
 //  Sequence overview:
-//    1.  Drive forward 38 cm.
-//    2–5. 360° spin in place (four heading waypoints).
-//    6.  Drive forward 63 cm (total x = 1.01 m).
-//    7.  Reverse 30 cm (x = 0.71 m).
-//    8.  180° in-place turn (theta = π).
-//    9.  Reverse 30 cm; DROP BEACON (x = 0.41 m).
-//    10–25. Boustrophedon sweep of field in ≈14 cm strips.
-//    26. Strafe left 83 cm; DEPOSIT payload (x = 0.52, y = −0.595).
-//    27. Strafe right 44 cm (recovery).
-//    28. Drive forward 180 cm — EXIT ZONE.
+//    1.  Drive forward 54 cm.
+//    2.  Strafe right 10 cm.
+//    3.  Turn right 90° (theta = -π/2).
+//    4.  Forward 73 cm, reverse 33 cm.
+//    5.  Raise arm 4 s, turn right 90° (theta = -π), lower arm 4 s.
+//    6.  Lower-field boustrophedon sweep.
+//    7.  Deposit in bucket (x = 1.03, y = -0.23).
+//    8.  Upper-field boustrophedon sweep (4 rows).
+//    9.  Sweep done; deposit in bucket (x = 1.01, y = -0.23).
+//   10.  Transit to cave april-tag zone.
+//   11.  Cave sweep: left-side probes, 180° spin, right-side probes.
+//   12.  Exit cave, forward 180 cm.
 //
-//  NOTE on waypoints [1]→[4]: The smooth spin through 0 → π/2 → π → −π/2
-//  then back to π/2 avoids the WrapAngle discontinuity at ±π.  If the robot
-//  oscillates badly at [4]→[5], insert an extra {0.38, 0.0, 0.0} waypoint
-//  to guide the PID back through 0 explicitly.
+//  All coordinates in metres (original waypoints ÷ 100).
+//  Theta expressed as multiples of pi (C++20 std::numbers::pi via PathConst).
 // ============================================================================
 static std::vector<Setpoint> Path_1() {
     using namespace PathConst;
     return {
-        // ── Phase 1: Initial advance ──────────────────────────────────────────
-        {0.38, 0.0, 0.0}, // [0]  Drive forward 38 cm
+        // ── Start ─────────────────────────────────────────────────────────────
+        { 0.00,  0.00,  0.0    },  // [0]  start
 
-        // ── Phase 2: Smooth 360° spin in place ───────────────────────────────
-        {0.38, 0.0, pi_2},  // [1]  Rotate 90° CCW  (face left)
-        {0.38, 0.0, pi},    // [2]  Rotate 90° more (face rearward)
-        {0.38, 0.0, -pi_2}, // [3]  Rotate 90° more (face right / 270°)
-        {0.38, 0.0, pi_2},  // [4]  Complete 360°   (back to left-facing)
+        // ── Approach ──────────────────────────────────────────────────────────
+        { 0.54,  0.00,  0.0    },  // [1]  forward 54 cm
+        { 0.54,  0.10,  0.0    },  // [2]  strafe right 10 cm
+        { 0.54,  0.10, -pi_2   },  // [3]  turn right 90°
+        { 1.27,  0.10, -pi_2   },  // [4]  forward 73 cm
+        { 0.94,  0.10, -pi_2   },  // [5]  reverse 33 cm
+        { 0.94,  0.10, -pi_2   },  // [6]  raise arm 4 s  (no movement)
+        { 0.94,  0.10, -pi     },  // [7]  turn right 90°
+        { 0.94,  0.10, -pi     },  // [8]  lower arm 4 s  (no movement)
 
-        // ── Phase 3: Forward run, reverse, turn, drop beacon ─────────────────
-        {1.01, 0.0, 0.0}, // [5]  Drive forward 63 cm (total 1.01 m)
-        {0.71, 0.0, 0.0}, // [6]  Reverse 30 cm
-        {0.71, 0.0, pi},  // [7]  180° turn (face rearward)
-        {0.41, 0.0, pi},  // [8]  Reverse 30 cm  ← DROP BEACON
+        // ── Lower field sweep ─────────────────────────────────────────────────
+        { 0.94, -0.23, -pi     },  // [9]  left 33 cm
+        { 1.11, -0.23, -pi     },  // [10] forward 17 cm
+        { 0.85, -0.23, -pi     },  // [11] reverse 26 cm
+        { 0.85, -0.06, -pi     },  // [12] right 17 cm
+        { 1.62, -0.06, -pi     },  // [13] forward 77 cm
+        { 1.62, -0.23, -pi     },  // [14] left 17 cm
+        { 1.95, -0.23, -pi     },  // [15] forward 33 cm
+        { 1.03, -0.23, -pi     },  // [16] reverse 92 cm  ← deposit in bucket
 
-        // ── Phase 4: Boustrophedon sweep (3-cm strips, rearward-facing) ───────
-        {0.41, -0.415, pi}, // [9]  Strafe left 41.5 cm (start col 1)
-        {0.64, -0.415, pi}, // [10] Forward  23 cm
-        {0.41, -0.415, pi}, // [11] Reverse  23 cm
-        {0.41, -0.245, pi}, // [12] Strafe right 17 cm  (col 2)
-        {1.03, -0.245, pi}, // [13] Forward  62 cm
-        {1.03, -0.435, pi}, // [14] Strafe left  19 cm  (col 3)
-        {1.35, -0.435, pi}, // [15] Forward  32 cm
-        {0.42, -0.435, pi}, // [16] Reverse  93 cm
-        {0.42, -0.245, pi}, // [17] Strafe right 19 cm  (col 4)
-        {1.36, -0.245, pi}, // [18] Forward  94 cm
-        {0.42, -0.245, pi}, // [19] Reverse  94 cm
-        {0.42, 0.005, pi},  // [20] Strafe right 25 cm  (col 5)
-        {1.35, 0.005, pi},  // [21] Forward  93 cm
-        {0.42, 0.005, pi},  // [22] Reverse  93 cm
-        {0.42, 0.235, pi},  // [23] Strafe right 23 cm  (col 6)
-        {1.20, 0.235, pi},  // [24] Forward  78 cm
-        {0.52, 0.235, pi},  // [25] Reverse  68 cm
+        // ── Upper field sweep ─────────────────────────────────────────────────
+        { 1.03,  0.01, -pi     },  // [17] right 24 cm
+        { 1.96,  0.01, -pi     },  // [18] forward 93 cm
+        { 0.86,  0.01, -pi     },  // [19] reverse 110 cm
+        { 0.86,  0.25, -pi     },  // [20] right 24 cm
+        { 1.93,  0.25, -pi     },  // [21] forward 107 cm
+        { 0.86,  0.25, -pi     },  // [22] reverse 107 cm
+        { 0.86,  0.49, -pi     },  // [23] right 24 cm
+        { 1.76,  0.49, -pi     },  // [24] forward 90 cm
+        { 0.86,  0.49, -pi     },  // [25] reverse 90 cm
+        { 0.86,  0.58, -pi     },  // [26] right 9 cm
+        { 1.76,  0.58, -pi     },  // [27] forward 90 cm
+        { 1.01,  0.58, -pi     },  // [28] reverse 75 cm  ← sweep done
 
-        // ── Phase 5: Deposit payload, then exit zone ──────────────────────────
-        {0.52, -0.595, pi}, // [26] Strafe left 83 cm  ← DEPOSIT
-        {0.52, -0.155, pi}, // [27] Strafe right 44 cm (clear deposit zone)
-        {2.32, -0.155, pi}, // [28] Drive 180 cm forward — EXIT ZONE
+        // ── Deposit + transit to cave ─────────────────────────────────────────
+        { 1.01, -0.23, -pi     },  // [29] left 82 cm     ← deposit in bucket
+        { 1.01,  0.17, -pi     },  // [30] right 41 cm
+        { 2.89,  0.17, -pi     },  // [31] forward 188 cm
 
-        // NOTE: Waypoint 5→6 transitions heading from π/2 back to 0 without an
-        // explicit intermediate. The PID handles it but watch for oscillation;
-        // add a dedicated spin waypoint here if the robot spins erratically.
-        //
-        // M_PI replaced with std::numbers::pi for C++20 / WPILib toolchain safety.
-        // ─────────────────────────────────────────────────────────────────────────────
+        // ── Cave april tag ────────────────────────────────────────────────────
+        { 2.48,  0.17, -pi           },  // [32] reverse 41 cm
+        { 2.48,  0.17, -3.0*pi/2.0   },  // [33] turn left 90°
+        { 2.48,  0.13, -3.0*pi/2.0   },  // [34] left 4 cm         (y motor)
+
+        { 2.88,  0.13, -3.0*pi/2.0   },  // [35] forward 40 cm     (x motor) probe
+        { 2.48,  0.13, -3.0*pi/2.0   },  // [36] reverse 40 cm
+        { 2.48,  0.38, -3.0*pi/2.0   },  // [37] right 25 cm       (y motor)
+        { 2.88,  0.38, -3.0*pi/2.0   },  // [38] forward 40 cm     probe
+        { 2.48,  0.38, -3.0*pi/2.0   },  // [39] reverse 40 cm
+        { 2.48,  0.57, -3.0*pi/2.0   },  // [40] right 19 cm       (y motor)
+        { 2.88,  0.57, -3.0*pi/2.0   },  // [41] forward 40 cm     probe
+        { 2.48,  0.57, -3.0*pi/2.0   },  // [42] reverse 40 cm
+
+        { 2.48,  0.16, -3.0*pi/2.0   },  // [43] left 41 cm        (y motor) return to center
+        { 2.48,  0.16, -pi_2          },  // [44] 180° in place
+        { 2.48,  0.20, -pi_2          },  // [45] right 4 cm        (y motor)
+
+        { 2.88,  0.20, -pi_2          },  // [46] forward 40 cm     probe
+        { 2.48,  0.20, -pi_2          },  // [47] reverse 40 cm
+        { 2.48, -0.05, -pi_2          },  // [48] left 25 cm        (y motor)
+        { 2.88, -0.05, -pi_2          },  // [49] forward 40 cm     probe
+        { 2.48, -0.05, -pi_2          },  // [50] reverse 40 cm
+        { 2.48, -0.24, -pi_2          },  // [51] left 19 cm        (y motor)
+        { 2.88, -0.24, -pi_2          },  // [52] forward 40 cm     probe
+        { 2.48, -0.24, -pi_2          },  // [53] reverse 40 cm
+
+        { 2.48, -0.19, -pi_2          },  // [54] right 5 cm        (y motor)
+        { 2.48, -0.19, -pi            },  // [55] turn right 90°
+        { 4.28, -0.19, -pi            },  // [56] forward 180 cm    ← exit cave
     };
 }
 
