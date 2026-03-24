@@ -204,6 +204,15 @@ static std::vector<Setpoint> Path_1() {
         { 2.48, -0.19, -pi_2          },  // [54] right 5 cm        (y motor)
         { 2.48, -0.19, -pi            },  // [55] turn right 90°
         { 4.28, -0.19, -pi            },  // [56] forward 180 cm    ← exit cave
+        { 4.28, -0.19,  0.0           },  // [66] 180° turn (now facing +x)
+        { 5.28, -0.19,  0.0           },  // [67] forward 100 cm     (+x)
+        { 5.28, -0.19, -pi_2          },  // [68] turn right 90°
+        { 5.03, -0.19, -pi_2          },  // [69] reverse 25 cm      (-x) //grab bucket
+        { 5.28, -0.19, -pi_2          },  // [70] forward 25 cm      (+x)
+        { 5.28,  0.21, -pi_2          },  // [71] strafe right 40 cm (+y)
+        { 5.28,  0.21, -pi            },  // [72] turn right 90°
+        { 5.28, -0.22, -pi            },  // [73] left strafe 43 cm  (-y)
+        { 4.98, -0.22, -pi            },  // [74] reverse 30 cm      (-x)
     };
 }
 
