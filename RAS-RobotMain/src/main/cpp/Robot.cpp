@@ -482,7 +482,7 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine
-    m_autoPhase = AutoPhase::APPROACH;
+    m_autoPhase = AutoPhase::TEST;
     m_taskDone  = false;
 
     // Clear NT completion flags so the Pi sees the reset
@@ -595,6 +595,48 @@ void Robot::AutonomousPeriodic() {
     // ── 7. State machine ──────────────────────────────────────────────────
     switch (m_autoPhase)
     {
+    //test mode for headless setup 
+    case AutoPhase::TEST:
+        // Init resets the step counter and starts the timer so TestPeriodic
+        // can sequence through servo and actuator checks automatically.
+        m_testStep = 0;
+        m_timer.Reset();
+        m_timer.Start();
+        std::cout << "[Test] TestInit — servo + actuator test sequence starting\n";
+
+        // Test sequences:
+        //   0-1 s  : servo grab
+        //   1-2 s  : servo release
+        //   2+ s   : actuator extend → stop → retract → stop (driven by m_testStep)
+        double elapsed = m_timer.Get().value();
+
+        if (elapsed < 1.0)
+        {
+            // Phase 1: move arm to grab position
+            static bool grabSent = false;
+            if (!grabSent)
+            {
+                TestServo();
+                grabSent = true;
+            }
+        }
+        else if (elapsed < 2.0)
+        {
+            // Phase 2: move arm to release position
+            static bool releaseSent = false;
+            if (!releaseSent)
+            {
+                TestServo();
+                releaseSent = true;
+            }
+        }
+        else
+        {
+            // Phase 3: actuator cycle (state machine in TestActuator)
+            TestActuator();
+        }
+        break;
+
     // ── DONE: hold position ───────────────────────────────────────────────
     case AutoPhase::DONE:
         StopAllDrive();
@@ -780,6 +822,112 @@ void Robot::AutonomousPeriodic() {
 }
 
 // ============================================================================
+//  Linear actuator helpers  (RoboClaw 0x81, M2)
+// ============================================================================
+
+// Extends the ore-deposit plate forward.
+void Robot::ActuatorExtend(uint8_t speed) {
+    RoboClawM2Forward(kRoboClawAddr_Strafe, speed);
+}
+
+// Retracts the ore-deposit plate back.
+void Robot::ActuatorRetract(uint8_t speed) {
+    RoboClawM2Backward(kRoboClawAddr_Strafe, speed);
+}
+
+// Stops the actuator in place.
+void Robot::ActuatorStop() {
+    RoboClawM2Forward(kRoboClawAddr_Strafe, 0);
+}
+
+// ============================================================================
+//  Bucket / beacon mechanisms
+// ============================================================================
+
+// GrabBucket – clamp m_servoArm onto the collection bucket.
+// TODO: verify kArmServoGrabPos is the correct clamped pulse width.
+void Robot::GrabBucket() {
+    m_servoArm.SetPulseWidth(kArmServoGrabPos);
+    std::cout << "[Mechanism] GrabBucket — arm to grab pos (" << kArmServoGrabPos << " μs)\n";
+}
+
+// DepositBeacon – move m_servoArm to drop the beacon, then extend the
+// linear actuator to push all ores out of the bucket.
+//
+// NOTE: This function starts the actuator but does NOT block.
+//       The caller must track time and call ActuatorStop() after
+//       kActuatorRunTime_s, then ActuatorRetract() / ActuatorStop() to home.
+// TODO: confirm kArmServoBeaconPos angle.
+// TODO: confirm kActuatorRunTime_s is long enough for full extension.
+void Robot::DepositBeacon() {
+    // 1. Drop beacon from arm
+    m_servoArm.SetPulseWidth(kArmServoBeaconPos);
+    std::cout << "[Mechanism] DepositBeacon — arm to beacon pos (" << kArmServoBeaconPos << " μs)\n";
+
+    // 2. Start pushing ores out
+    ActuatorExtend(kActuatorSpeed);
+    m_actuatorExtended = true;
+    std::cout << "[Mechanism] DepositBeacon — actuator extending at speed " << (int)kActuatorSpeed << "\n";
+}
+
+// ============================================================================
+//  Test routines
+// ============================================================================
+
+// TestServo – toggles m_servoArm between grab and release on each call.
+// Use with a timer in TestPeriodic to add dwell time between toggles.
+void Robot::TestServo() {
+    static bool grabbed = false;
+    grabbed = !grabbed;
+    int pw = grabbed ? kArmServoGrabPos : kArmServoDropPos;
+    m_servoArm.SetPulseWidth(pw);
+    std::cout << "[Test] Servo arm → " << (grabbed ? "GRAB" : "RELEASE")
+              << " (" << pw << " μs)\n";
+}
+
+// TestActuator – runs a full extend-then-retract cycle.
+// Driven by m_testStep + m_timer; call TestActuator() each TestPeriodic tick.
+//   Step 0 → 1 : extend for kActuatorRunTime_s
+//   Step 2 → 3 : retract for kActuatorRunTime_s
+//   Step 4      : done
+void Robot::TestActuator() {
+    double elapsed = m_timer.Get().value();
+    switch (m_testStep) {
+        case 0:
+            std::cout << "[Test] Actuator — extending\n";
+            ActuatorExtend(kActuatorSpeed);
+            m_timer.Reset();
+            m_testStep = 1;
+            break;
+        case 1:
+            if (elapsed >= kActuatorRunTime_s) {
+                std::cout << "[Test] Actuator — extended, stopping\n";
+                ActuatorStop();
+                m_actuatorExtended = true;
+                m_timer.Reset();
+                m_testStep = 2;
+            }
+            break;
+        case 2:
+            std::cout << "[Test] Actuator — retracting\n";
+            ActuatorRetract(kActuatorSpeed);
+            m_timer.Reset();
+            m_testStep = 3;
+            break;
+        case 3:
+            if (elapsed >= kActuatorRunTime_s) {
+                std::cout << "[Test] Actuator — retracted, stopping\n";
+                ActuatorStop();
+                m_actuatorExtended = false;
+                m_testStep = 4;
+            }
+            break;
+        default:
+            break; // test complete
+    }
+}
+
+// ============================================================================
 //  TeleopInit / TeleopPeriodic
 // ============================================================================
 
@@ -801,9 +949,15 @@ void Robot::DisabledInit() {
 
 void Robot::DisabledPeriodic() {}
 
-void Robot::TestInit() {}
 
-void Robot::TestPeriodic() {}
+void Robot::TestInit() {
+
+}
+
+
+void Robot::TestPeriodic() {
+   
+}
 
 void Robot::SimulationPeriodic() {}
 

@@ -31,7 +31,8 @@
 enum class AutoPhase{
     SEARCH,
     APPROACH,
-    DONE
+    DONE,
+    TEST
 };
 
 class Robot : public frc::TimesliceRobot {
@@ -237,4 +238,32 @@ class Robot : public frc::TimesliceRobot {
   // Vision/sweep_done  → Legacy sweep-completion signal (kept for compatibility).
   nt::BooleanPublisher m_taskDonePub;
   nt::BooleanPublisher m_sweepDonePub;
+
+  // ── Linear actuator (RoboClaw 0x81, M2) ─────────────────────────────────
+  // Electrical confirmed: plugged into the M2 terminals on the same controller
+  // as the strafe motor (M1). Extend pushes the ore deposit plate forward.
+  void ActuatorExtend (uint8_t speed);
+  void ActuatorRetract(uint8_t speed);
+  void ActuatorStop   ();
+
+  static constexpr uint8_t kActuatorSpeed     = 80;   // TODO: tune – 0-127
+  static constexpr double  kActuatorRunTime_s = 2.0;  // TODO: tune – seconds to full extend/retract
+  bool m_actuatorExtended = false;
+
+  // ── Bucket / beacon mechanisms ───────────────────────────────────────────
+  // Only m_servoArm is used in the non-sorting system.
+  void GrabBucket   ();  // Clamp arm onto collection bucket
+  void DepositBeacon();  // Drop beacon from arm into goal zone
+
+  // TODO: measure and set these pulse widths on real hardware (μs, 500–2500)
+  static constexpr int kArmServoGrabPos   = 500;  // TODO: closed/clamped position
+  static constexpr int kArmServoDropPos   = 1500; // TODO: open/release position
+  static constexpr int kArmServoBeaconPos = 1000; // TODO: beacon-deposit angle (may equal drop)
+
+  // ── Test routines ────────────────────────────────────────────────────────
+  // Call from TestInit()/TestPeriodic() to verify hardware before a match.
+  void TestServo   ();  // Sweeps arm servo: grab → wait → release
+  void TestActuator();  // Extends actuator → waits → retracts
+
+  int m_testStep = 0;   // Step counter used by TestPeriodic() sequencer
 };
