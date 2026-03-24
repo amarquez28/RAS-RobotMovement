@@ -31,8 +31,7 @@
 enum class AutoPhase{
     SEARCH,
     APPROACH,
-    DONE,
-    TEST
+    DONE
 };
 
 class Robot : public frc::TimesliceRobot {
@@ -252,8 +251,9 @@ class Robot : public frc::TimesliceRobot {
 
   // ── Bucket / beacon mechanisms ───────────────────────────────────────────
   // Only m_servoArm is used in the non-sorting system.
-  void GrabBucket   ();  // Clamp arm onto collection bucket
-  void DepositBeacon();  // Drop beacon from arm into goal zone
+  void GrabBucket   ();  // Raise arm then clamp onto collection bucket
+  void DepositBeacon();  // Raise arm to beacon-drop angle; beacon detaches
+  void DepositOres  ();  // Extend actuator at full speed to push all ores out
 
   // TODO: measure and set these pulse widths on real hardware (μs, 500–2500)
   static constexpr int kArmServoGrabPos   = 500;  // TODO: closed/clamped position

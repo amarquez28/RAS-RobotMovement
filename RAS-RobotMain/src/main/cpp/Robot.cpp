@@ -482,7 +482,7 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine
-    m_autoPhase = AutoPhase::TEST;
+    m_autoPhase = AutoPhase::SEARCH;
     m_taskDone  = false;
 
     // Reset test sequencer
@@ -600,26 +600,6 @@ void Robot::AutonomousPeriodic() {
     // ── 7. State machine ──────────────────────────────────────────────────
     switch (m_autoPhase)
     {
-    //test mode for headless setup 
-    case AutoPhase::TEST: {
-        // Test sequences (m_testStep + m_timer reset in AutonomousInit):
-        //   0-1 s  : servo grab
-        //   1-2 s  : servo release
-        //   2+ s   : actuator extend → stop → retract → stop
-        double elapsed = m_timer.Get().value();
-
-        if (elapsed < 1.0) {
-            static bool grabSent = false;
-            if (!grabSent) { TestServo(); grabSent = true; }
-        } else if (elapsed < 2.0) {
-            static bool releaseSent = false;
-            if (!releaseSent) { TestServo(); releaseSent = true; }
-        } else {
-            TestActuator();
-        }
-        break;
-    }
-
     // ── DONE: hold position ───────────────────────────────────────────────
     case AutoPhase::DONE:
         StopAllDrive();
@@ -645,26 +625,6 @@ void Robot::AutonomousPeriodic() {
 
     // ── APPROACH: PID-controlled drive toward tag ─────────────────────────
     case AutoPhase::APPROACH:
-    /*
-        // Safety: tag lost mid-approach → stop and re-search
-        if (!hasTag) {
-            StopAllDrive();
-            m_autoPhase = AutoPhase::SEARCH;
-            frc::SmartDashboard::PutString("Auto/Phase", "Search (tag lost)");
-            break;
-        }
-    */
-        // Stop condition
-        // if (tag.distance <= kStopDistance_m) {
-        //     StopAllDrive();
-        //     m_taskDonePub.Set(true);
-        //     m_sweepDonePub.Set(true); // legacy key for Pi compatibility
-        //     m_taskDone  = true;
-        //     m_autoPhase = AutoPhase::DONE;
-        //     frc::SmartDashboard::PutString("Auto/Phase", "Done");
-        //     break;
-        // }
-
         // ── PID computation ───────────────────────────────────────────────
         // Setpoint: drive x forward by tag.distance, hold y, hold heading.
         // The tag distance is the live "how far until we stop" signal.
@@ -824,90 +784,38 @@ void Robot::ActuatorStop() {
 }
 
 // ============================================================================
-//  Bucket / beacon mechanisms
+//  Bucket / beacon / ore mechanisms
 // ============================================================================
 
-// GrabBucket – clamp m_servoArm onto the collection bucket.
-// TODO: verify kArmServoGrabPos is the correct clamped pulse width.
+// GrabBucket – raise the arm to clear the bucket lip, then lower back to the
+// init/clamped position to lock onto the bucket.
+// The path is responsible for waiting between these two steps:
+//   1. Call GrabBucket() → arm raises to ArmServoOpenPos (1200 μs)
+//   2. Wait ~1 s for servo to travel
+//   3. Call GrabBucket() again → arm lowers to ArmServoInitPos (500 μs)
 void Robot::GrabBucket() {
-    m_servoArm.SetPulseWidth(kArmServoGrabPos);
-    std::cout << "[Mechanism] GrabBucket — arm to grab pos (" << kArmServoGrabPos << " μs)\n";
-}
-
-// DepositBeacon – move m_servoArm to drop the beacon, then extend the
-// TODO: confirm kArmServoBeaconPos angle.
-void Robot::DepositBeacon() {
-    // 1. Drop beacon from arm
-    m_servoArm.SetPulseWidth(kArmServoBeaconPos);
-    std::cout << "[Mechanism] DepositBeacon — arm to beacon pos (" << kArmServoBeaconPos << " μs)\n";
-
-}
-
-// ============================================================================
-//  Test routines
-// ============================================================================
-
-// TestServo – toggles m_servoArm between grab and release on each call.
-// Use with a timer in TestPeriodic to add dwell time between toggles.
-void Robot::TestServo() {
-    m_servoArm.SetPulseWidth(ArmServoInitPos);
-    static bool grabbed = false;
-    grabbed = !grabbed;
-    int pw = grabbed ? kArmServoGrabPos : kArmServoDropPos;
+    static bool raised = false;
+    raised = !raised;
+    int pw = raised ? ArmServoOpenPos : ArmServoInitPos;
     m_servoArm.SetPulseWidth(pw);
-    std::cout << "[Test] Servo arm → " << (grabbed ? "GRAB" : "RELEASE")
-              << " (" << pw << " μs)\n";
 }
 
-// TestActuator – runs a full extend-then-retract cycle.
-// Driven by m_testStep + m_timer; call TestActuator() each TestPeriodic tick.
-//   Step 0 → 1 : extend for kActuatorRunTime_s
-//   Step 2 → 3 : retract for kActuatorRunTime_s
-//   Step 4      : done
-void Robot::TestActuator() {
-    double elapsed = m_timer.Get().value();
-    switch (m_testStep) {
-        case 0:
-            std::cout << "[Test] Actuator — extending\n";
-            ActuatorExtend(kActuatorSpeed);
-            m_timer.Reset();
-            m_testStep = 1;
-            break;
-        case 1:
-            if (elapsed >= kActuatorRunTime_s) {
-                std::cout << "[Test] Actuator — extended, stopping\n";
-                ActuatorStop();
-                m_actuatorExtended = true;
-                m_timer.Reset();
-                m_testStep = 2;
-            }
-            break;
-        case 2:
-            std::cout << "[Test] Actuator — retracting\n";
-            ActuatorRetract(kActuatorSpeed);
-            m_timer.Reset();
-            m_testStep = 3;
-            break;
-        case 3:
-            if (elapsed >= kActuatorRunTime_s) {
-                std::cout << "[Test] Actuator — retracted, stopping\n";
-                ActuatorStop();
-                m_actuatorExtended = false;
-                m_testStep = 4;
-            }
-            break;
-        case 4:
-            ActuatorRetract(kActuatorSpeed);
-            m_timer.Reset();
-            m_testStep = 5;
-            break;
-        case 5:
-            if(elapsed >= kActuatorRunTime_s){
-                ActuatorStop();
-            }
-        default:
-            break; // test complete
-    }
+// DepositBeacon – raise the arm to the beacon-drop angle so the beacon
+// detaches and falls into the goal zone.
+// TODO: tune kArmServoBeaconPos (currently 1000 μs) for the right release angle.
+void Robot::DepositBeacon() {
+    m_servoArm.SetPulseWidth(kArmServoBeaconPos);
+}
+
+// DepositOres – extend the linear actuator at full speed for kActuatorRunTime_s
+// to push all ores out of the bucket.
+// Non-blocking: starts the actuator and sets m_actuatorExtended = true.
+// The path must call ActuatorStop() after kActuatorRunTime_s (5 s),
+// then ActuatorRetract() + ActuatorStop() to home the plate.
+void Robot::DepositOres() {
+    ActuatorExtend(kActuatorSpeed);
+    m_actuatorExtended = true;
+    std::cout << "[Mechanism] DepositOres — actuator extending at speed " << (int)kActuatorSpeed << "\n";
 }
 
 // ============================================================================
