@@ -156,7 +156,7 @@ class Robot : public frc::TimesliceRobot {
   static constexpr int BrushServoInitPos    = 500;
   static constexpr int BrushServoOpenPos    = 1500;
   static constexpr int ArmServoInitPos      = 500;
-  static constexpr int ArmServoOpenPos      = 1500;
+  static constexpr int ArmServoOpenPos      = 1200;
   static constexpr int ReleaseServoInitPos  = 500;
   static constexpr int ReleaseServoOpenPos  = 1500;
 
@@ -257,7 +257,7 @@ class Robot : public frc::TimesliceRobot {
 
   // TODO: measure and set these pulse widths on real hardware (μs, 500–2500)
   static constexpr int kArmServoGrabPos   = 500;  // TODO: closed/clamped position
-  static constexpr int kArmServoDropPos   = 1500; // TODO: open/release position
+  static constexpr int kArmServoDropPos   = 1200; // TODO: open/release position
   static constexpr int kArmServoBeaconPos = 1000; // TODO: beacon-deposit angle (may equal drop)
 
   // ── Test routines ────────────────────────────────────────────────────────

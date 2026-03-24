@@ -860,6 +860,7 @@ void Robot::DepositBeacon() {
 // TestServo – toggles m_servoArm between grab and release on each call.
 // Use with a timer in TestPeriodic to add dwell time between toggles.
 void Robot::TestServo() {
+    m_servoArm.SetPulseWidth(ArmServoInitPos);
     static bool grabbed = false;
     grabbed = !grabbed;
     int pw = grabbed ? kArmServoGrabPos : kArmServoDropPos;
