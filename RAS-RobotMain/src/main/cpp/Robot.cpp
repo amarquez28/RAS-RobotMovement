@@ -12,7 +12,7 @@
 #include <algorithm> 
 #include <iostream>
 #include <numbers>
-
+/*
 int HallServoInitPos = 500; //Hall Servo Closed position
 int HallServoOpenPos = 1500;  //Hall Servo Open Position
 int BrushServoInitPos = 500; //Closed position
@@ -20,7 +20,7 @@ int BrushServoOpenPos = 1500;  //Open Position
 int ArmServoInitPos = 500; //Closed position
 int ArmServoOpenPos = 1500;  //Open Position
 int ReleaseServoInitPos = 500; //Closed position
-int ReleaseServoOpenPos = 1500;  //Open Position
+int ReleaseServoOpenPos = 1500;  //Open Position */
 int pulse = 500;
 int dir = 1;
 int counter = 0;
@@ -48,7 +48,7 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   // m_chooser.SetDefaultOption(kAutoNameDefault, kAutoNameDefault);
   // m_chooser.AddOption(kAutoNameCustom, kAutoNameCustom);
   frc::SmartDashboard::PutData("Auto Modes", &m_chooser);
-
+/*
   m_servoArm.SetPowered(true);
   m_servoBrush.SetPowered(true);
   m_servoRelease.SetPowered(true);
@@ -57,7 +57,7 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
   m_servoArm.SetEnabled(true);
   m_servoBrush.SetEnabled(true);
   m_servoRelease.SetEnabled(true);
-  m_servoHall.SetEnabled(true); 
+  m_servoHall.SetEnabled(true); */
 
   InitIMU();
 
@@ -232,10 +232,10 @@ void Robot::RobotPeriodic() {
   else {
     m_servo2.SetPulseWidth(HallServoInitPos);
   } */
-  m_servoHall.SetPulseWidth(HallServoInitPos);
+  /*m_servoHall.SetPulseWidth(HallServoInitPos);
   m_servoRelease.SetPulseWidth(ReleaseServoInitPos);
   m_servoArm.SetPulseWidth(ArmServoInitPos);
-  m_servoBrush.SetPulseWidth(HallServoInitPos);
+  m_servoBrush.SetPulseWidth(HallServoInitPos);*/
   //hall sensor dashboard values
   frc::SmartDashboard::PutNumber("Hall Voltage (V)", m_hallAnalog.GetVoltage());
   frc::SmartDashboard::PutNumber("Hall Raw (0-4095)", m_hallAnalog.GetValue());
@@ -275,9 +275,7 @@ double Robot::WrapAngle(double angle) {
 
 void Robot::LoadAutonomousSetpoints() {
   m_setpoints = {
-    {0.20, 0.0, 0.0},
-    {0.20, 0.0, std::numbers::pi / 2.0},
-    {0.40, 0.0, std::numbers::pi / 2.0}
+    {0.0, 0.40, 0.0}
   };
 
   m_currentSetpointIndex = 0;
@@ -308,9 +306,8 @@ void Robot::AutonomousInit() {
   m_timer.Reset();
   m_timer.Start();
   RoboClawStopAll();
-  RoboClawDrain();
   RoboClawResetAllEncoders();
-  CalibrateGyroZBias();
+  RoboClawDrain();
   // Force known start position
   // m_servo0.SetPulseWidth(HallServoInitPos);
 
@@ -318,6 +315,7 @@ void Robot::AutonomousInit() {
   LoadAutonomousSetpoints();
   m_thetaRad = 0.0;
   m_firstPidLoop = true;
+  CalibrateGyroZBias();
 }
 
 static void InitIMU() {
@@ -512,10 +510,6 @@ void Robot::AutonomousPeriodic() {
   x_integral += x_error_meters * dt;
   y_integral += y_error_meters * dt;
   theta_integral += theta_error * dt;
-  // Anti-windup clamp
-  x_integral = std::clamp(x_integral, -10.0, 10.0);
-  y_integral = std::clamp(y_integral, -10.0, 10.0);
-  theta_integral = std::clamp(theta_integral, -10.0, 10.0);
 
   // Derivative
   double x_derivative = (x_error_meters - x_prevError) / dt;
@@ -523,18 +517,21 @@ void Robot::AutonomousPeriodic() {
   double theta_derivative = (theta_error - theta_prevError) / dt;
   
   //Gain Scheduling
-  double abs_theta_error = std::abs(theta_error);
-  double scheduled_theta_kP = 40.0;
-  if (abs_theta_error > std::numbers::pi / 4) {
-    scheduled_theta_kP = 80.0;
-  } else if (abs_theta_error > std::numbers::pi / 12) {
-    scheduled_theta_kP = 60.0;
-  }
-
+  //double abs_theta_error = std::abs(theta_error);
+            //double sched_kP  = 20.0;
+            //if      (abs_theta_error > std::numbers::pi / 4)  sched_kP = 80.0;
+            //else if (abs_theta_error > std::numbers::pi / 12) sched_kP = 40.0;
+    double sched_kP = 0.0;
   // PID controller
   double x_controller = x_kP * x_error_meters + x_kI * x_integral + x_kD * x_derivative;
   double y_controller = y_kP * y_error_meters + y_kI * y_integral + y_kD * y_derivative;
-  double theta_controller = scheduled_theta_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_derivative;
+  double theta_controller = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_derivative;
+
+  // Anti-windup: only freeze the integral when the output is saturated.
+            // If saturated, undo this tick's accumulation and recompute.
+            if (std::abs(x_controller)     > 127.0) { x_integral     -= x_error_meters     * dt; x_controller    = x_kP     * x_error_meters     + x_kI     * x_integral     + x_kD     * x_derivative; }
+            if (std::abs(y_controller)     > 127.0) { y_integral     -= y_error_meters     * dt; y_controller     = y_kP     * y_error_meters     + y_kI     * y_integral     + y_kD     * y_derivative; }
+            if (std::abs(theta_controller) >  80.0) { theta_integral -= theta_error * dt; theta_controller = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_derivative; }
   
   // Save error for next loop
   x_prevError = x_error_meters;
@@ -549,13 +546,17 @@ void Robot::AutonomousPeriodic() {
   if (std::abs(x_error_meters) <= x_tolerance) {
     x_controller = 0.0;
     x_integral = 0.0;
+    x_prevError = 0.0;
   }
   if (std::abs(y_error_meters) <= y_tolerance) {
     y_controller = 0.0;
-    y_integral = 0.0; } 
+    y_integral = 0.0;
+    y_prevError = 0.0;
+    } 
   if (std::abs(theta_error) <= theta_tolerance) {
     theta_controller = 0.0;
     theta_integral = 0.0;
+    theta_prevError = 0.0;
   }
 
   //At target logic
@@ -566,6 +567,7 @@ void Robot::AutonomousPeriodic() {
   if (x_at_target && y_at_target && theta_at_target) {
     AdvanceToNextSetpoint();
     RoboClawStopAll();
+    ResetPidState();
     return;
   }
 
@@ -577,8 +579,8 @@ void Robot::AutonomousPeriodic() {
   // Minimum command only outside tolerance
   if (theta_controller > 0.0 && theta_controller < 25.0) theta_controller = 25.0;
   if (theta_controller < 0.0 && theta_controller > -25.0) theta_controller = -25.0;
-  if (y_controller > 0.0 && y_controller < 15.0) y_controller = 15.0;
-  if (y_controller < 0.0 && y_controller > -15.0) y_controller = -15.0;
+  if (y_controller > 0.0 && y_controller < 20.0) y_controller = 20.0;
+  if (y_controller < 0.0 && y_controller > -20.0) y_controller = -20.0;
 
   //Motor Mixing
   double xr_controller = x_controller + theta_controller;
@@ -655,6 +657,8 @@ void Robot::TeleopPeriodic() {}
 void Robot::DisabledInit() {
   RoboClawDrain();
   RoboClawStopAll();
+  RoboClawResetAllEncoders();
+  ResetPidState();
 }
 
 void Robot::DisabledPeriodic() {}
