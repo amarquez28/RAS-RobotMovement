@@ -659,9 +659,6 @@ void Robot::AutonomousPeriodic() {
             x_integral     += x_error     * dt;
             y_integral     += y_error     * dt;
             theta_integral += theta_error * dt;
-            x_integral      = std::clamp(x_integral,     -10.0, 10.0);
-            y_integral      = std::clamp(y_integral,     -10.0, 10.0);
-            theta_integral  = std::clamp(theta_integral, -10.0, 10.0);
 
             // Differentiate
             double x_deriv     = (x_error     - x_prevError)     / dt;
@@ -677,6 +674,12 @@ void Robot::AutonomousPeriodic() {
             double x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv;
             double y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv;
             double theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv;
+
+            // Anti-windup: only freeze the integral when the output is saturated.
+            // If saturated, undo this tick's accumulation and recompute.
+            if (std::abs(x_cmd)     > 127.0) { x_integral     -= x_error     * dt; x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv; }
+            if (std::abs(y_cmd)     > 127.0) { y_integral     -= y_error     * dt; y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv; }
+            if (std::abs(theta_cmd) >  80.0) { theta_integral -= theta_error * dt; theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv; }
 
             // Save errors for next derivative calculation
             x_prevError     = x_error;
