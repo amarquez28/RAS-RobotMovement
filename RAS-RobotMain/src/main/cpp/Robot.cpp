@@ -482,7 +482,7 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine
-    m_autoPhase = AutoPhase::SEARCH;
+    m_autoPhase = AutoPhase::APPROACH;
     m_taskDone  = false;
 
     // Reset test sequencer
@@ -631,16 +631,21 @@ void Robot::AutonomousPeriodic() {
         {
             // Use setpoints from the loaded list if they haven't all been
             // completed, otherwise fall back to a simple tag-distance target.
-            double x_target, y_target, theta_target;
-            if (!m_autoComplete && !m_setpoints.empty()) {
-                const auto& sp = m_setpoints[m_currentSetpointIndex];
-                x_target     = sp.x_trgt;
-                y_target     = sp.y_trgt;
-                theta_target = sp.theta_rad_trgt;
+            // All waypoints done → stop and hold
+            if (m_autoComplete || m_setpoints.empty()) {
+                StopAllDrive();
+                m_autoPhase = AutoPhase::DONE;
+                frc::SmartDashboard::PutString("Auto/Phase", "Done (path complete)");
+                break;
             }
+
+            const auto& sp = m_setpoints[m_currentSetpointIndex];
+            double x_target     = sp.x_trgt;
+            double y_target     = sp.y_trgt;
+            double theta_target = sp.theta_rad_trgt;
+
             //uncomment when we bring back april tag detection
             // } else {
-            //     // Simple fallback: drive forward by tag distance, hold current y/theta
             //     x_target     = x_pos + tag.distance;
             //     y_target     = y_pos;
             //     theta_target = m_thetaRad;
