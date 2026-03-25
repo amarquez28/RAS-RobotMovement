@@ -499,9 +499,9 @@ void Robot::AutonomousInit() {
 
     // Snapshot encoders then zero them (UpdateEncoders fills the members;
     // we then overwrite with 0 so sweep distances are relative)
-    UpdateEncoders();
-    m_vertTicks  = 0;
-    m_horizTicks = 0;
+    //UpdateEncoders();
+    //m_vertTicks  = 0;
+    //m_horizTicks = 0;
 
     // Close hatch door
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
@@ -532,7 +532,7 @@ void Robot::AutonomousInit() {
 
 void Robot::AutonomousPeriodic() {
     // ── 1. Update sensors ──────────────────────────────────────────────────
-    UpdateEncoders();
+    //UpdateEncoders();
 
     // ── 2. Vision connection heartbeat ────────────────────────────────────
     // IsConnected() must be called every tick (it compares heartbeat counters).
