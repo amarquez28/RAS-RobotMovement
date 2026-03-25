@@ -606,6 +606,48 @@ void Robot::AutonomousPeriodic() {
         frc::SmartDashboard::PutString("Auto/Phase", "Done");
         break;
 
+    // ── TAG_SEARCH: default path done, waiting for AprilTag ID ───────────
+    // Robot holds position. When a tag is seen, its ID selects the next path.
+    // If no tag is found within kTagSearchTimeout_s, go to DONE.
+    case AutoPhase::TAG_SEARCH: {
+        StopAllDrive();
+        double searchElapsed = m_timer.Get().value();
+        frc::SmartDashboard::PutString("Auto/Phase", "Tag Search");
+        frc::SmartDashboard::PutNumber("Auto/TagSearchTime_s", searchElapsed);
+
+        int tagId = 0;
+        bool tagFound = hasTag;
+        if (tagFound) {
+            tagId = m_aprilTagReader.GetPrimaryTag().id;
+        }
+
+        bool timedOut = (searchElapsed >= kTagSearchTimeout_s);
+
+        if (!tagFound && !timedOut) {
+            break; // still searching
+        }
+
+        if (timedOut && !tagFound) {
+            std::cout << "[Auto] Tag search timed out — going to DONE\n";
+            frc::SmartDashboard::PutString("Auto/Phase", "Done (tag timeout)");
+            m_autoPhase = AutoPhase::DONE;
+            break;
+        }
+
+        // Tag found — load the corresponding path, reset pose, start running
+        std::cout << "[Auto] Tag ID " << tagId << " detected — loading sub-path\n";
+        m_setpoints = AutonomousPaths::GetPath(tagId);
+        m_currentSetpointIndex = 0;
+        m_autoComplete = m_setpoints.empty();
+        ResetPidState();
+        RoboClawResetAllEncoders();
+        m_vertTicks  = 0;
+        m_horizTicks = 0;
+        m_autoPhase  = AutoPhase::APPROACH;
+        frc::SmartDashboard::PutNumber("Auto/TagId", tagId);
+        break;
+    }
+
     // ── SEARCH: wait for a visible tag ───────────────────────────────────
     case AutoPhase::SEARCH:
         StopAllDrive();
@@ -699,8 +741,18 @@ void Robot::AutonomousPeriodic() {
             bool theta_done = (std::abs(theta_error) <= kThetaTol);
 
             if (x_done && y_done && theta_done) {
-                AdvanceToNextSetpoint();
-                RoboClawStopAll();
+                // Check if this is the handoff waypoint before advancing.
+                // If so, stop and switch to TAG_SEARCH instead of continuing.
+                if (m_currentSetpointIndex == kTagHandoffWaypoint) {
+                    RoboClawStopAll();
+                    m_timer.Reset();
+                    m_timer.Start();
+                    m_autoPhase = AutoPhase::TAG_SEARCH;
+                    std::cout << "[Auto] Reached tag handoff waypoint — searching for AprilTag\n";
+                } else {
+                    AdvanceToNextSetpoint();
+                    RoboClawStopAll();
+                }
                 break;
             }
 

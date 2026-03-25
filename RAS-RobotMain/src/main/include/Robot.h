@@ -25,12 +25,15 @@
 #include <AutonomousPaths.h>
 
 // ── Autonomous phase ─────────────────────────────────────────────────────────
-// SEARCH  : No tag visible yet – robot holds position and waits.
-// APPROACH: Tag detected – robot drives straight toward it until ≤ 0.5 m away.
-// DONE    : Within stopping distance – motors stopped, Pi notified.
+// SEARCH    : No tag visible yet – robot holds position and waits.
+// APPROACH  : Running a waypoint path via PID dead-reckoning.
+// TAG_SEARCH: Default path complete – robot holds position and reads AprilTag
+//             ID to select which sub-path to run next.
+// DONE      : All paths complete – motors stopped, Pi notified.
 enum class AutoPhase{
     SEARCH,
     APPROACH,
+    TAG_SEARCH,
     DONE
 };
 
@@ -147,7 +150,16 @@ class Robot : public frc::TimesliceRobot {
 
   std::vector<Setpoint> m_setpoints;
   size_t m_currentSetpointIndex = 0;
-  bool m_autoComplete = false; 
+  bool m_autoComplete = false;
+
+  // Index of the last waypoint in Path_Default before handing off to
+  // TAG_SEARCH. After arriving here the robot stops, reads the AprilTag ID,
+  // and loads the corresponding sub-path. Matches the end of the bucket grab
+  // sequence in Path_Default (waypoint [40] per CLAUDE.md waypoint table).
+  static constexpr size_t kTagHandoffWaypoint = 40;
+
+  // How long to search for a tag before giving up and going to DONE.
+  static constexpr double kTagSearchTimeout_s = 5.0; 
 
   // Servo pulse widths (microseconds)
   static constexpr int kHallServoInitPos    = 500;   // Closed
