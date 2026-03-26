@@ -731,7 +731,7 @@ void Robot::AutonomousPeriodic() {
             // Zero out axis when within tolerance (also prevents integral windup)
             constexpr double kXTol     = 0.005;
             constexpr double kYTol     = 0.005;
-            constexpr double kThetaTol = 0.02;
+            constexpr double kThetaTol = 0.05;  // ~3° — tight enough for accuracy, wide enough to settle
             if (std::abs(x_error)     <= kXTol)     { x_cmd     = 0.0; x_integral     = 0.0; }
             if (std::abs(y_error)     <= kYTol)      { y_cmd     = 0.0; y_integral     = 0.0; }
             if (std::abs(theta_error) <= kThetaTol) { theta_cmd = 0.0; theta_integral = 0.0; }
@@ -762,8 +762,8 @@ void Robot::AutonomousPeriodic() {
             theta_cmd = std::clamp(theta_cmd,  -80.0,  80.0);
 
             // Minimum command (deadband kick) outside tolerance only
-            if (theta_cmd > 0.0 && theta_cmd < 25.0) theta_cmd = 25.0;
-            if (theta_cmd < 0.0 && theta_cmd > -25.0) theta_cmd = -25.0;
+            if (theta_cmd > 0.0 && theta_cmd < 15.0) theta_cmd = 15.0;
+            if (theta_cmd < 0.0 && theta_cmd > -15.0) theta_cmd = -15.0;
             if (y_cmd > 0.0 && y_cmd < 15.0) y_cmd = 15.0;
             if (y_cmd < 0.0 && y_cmd > -15.0) y_cmd = -15.0;
 
