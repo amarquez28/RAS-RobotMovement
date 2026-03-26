@@ -460,8 +460,10 @@ void Robot::AutonomousInit() {
     m_timer.Start();
 
     // Reset all encoders to zero so dead-reckoning is relative to start pos
-    RoboClawResetAllEncoders();
     RoboClawDrain();
+    RoboClawResetAllEncoders();
+    RoboClawStopAll();
+    ResetPidState();
 
     // Re-init IMU in case of a power cycle between runs
     IMUInit();
@@ -709,9 +711,11 @@ void Robot::AutonomousPeriodic() {
 
             // Gain scheduling for theta: larger P when heading error is large
             double abs_theta = std::abs(theta_error);
-            double sched_kP  = 40.0;
-            if      (abs_theta > std::numbers::pi / 4)  sched_kP = 80.0;
-            else if (abs_theta > std::numbers::pi / 12) sched_kP = 60.0;
+            double sched_kP  = 20.0;
+            if (abs_theta > std::numbers::pi / 4)
+                sched_kP = 80.0;
+            else if (abs_theta > std::numbers::pi / 12)
+                sched_kP = 40.0;
 
             double x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv;
             double y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv;
@@ -731,10 +735,28 @@ void Robot::AutonomousPeriodic() {
             // Zero out axis when within tolerance (also prevents integral windup)
             constexpr double kXTol     = 0.005;
             constexpr double kYTol     = 0.005;
-            constexpr double kThetaTol = 0.05;  // ~3° — tight enough for accuracy, wide enough to settle
-            if (std::abs(x_error)     <= kXTol)     { x_cmd     = 0.0; x_integral     = 0.0; }
-            if (std::abs(y_error)     <= kYTol)      { y_cmd     = 0.0; y_integral     = 0.0; }
-            if (std::abs(theta_error) <= kThetaTol) { theta_cmd = 0.0; theta_integral = 0.0; }
+            constexpr double kThetaTol = 0.05; // ~3° — tight enough for accuracy, wide enough to settle
+            if (std::abs(x_error) <= kXTol)
+            {
+                x_cmd = 0.0;
+                x_integral = 0.0;
+                x_prevError = 0.0;
+                x_deriv = 0.0;
+            }
+            if (std::abs(y_error) <= kYTol)
+            {
+                y_cmd = 0.0;
+                y_integral = 0.0;
+                y_prevError = 0.0;
+                y_deriv = 0.0;
+            }
+            if (std::abs(theta_error) <= kThetaTol)
+            {
+                theta_cmd = 0.0;
+                theta_integral = 0.0;
+                theta_prevError = 0.0;
+                theta_deriv = 0.0;
+            }
 
             bool x_done     = (std::abs(x_error)     <= kXTol);
             bool y_done     = (std::abs(y_error)     <= kYTol);
@@ -743,12 +765,13 @@ void Robot::AutonomousPeriodic() {
             if (x_done && y_done && theta_done) {
                 // Check if this is the handoff waypoint before advancing.
                 // If so, stop and switch to TAG_SEARCH instead of continuing.
+                RoboClawStopAll();
+                ResetPidState();
                 if (m_currentSetpointIndex == kTagHandoffWaypoint) {
                     RoboClawStopAll();
                     m_timer.Reset();
                     m_timer.Start();
                     m_autoPhase = AutoPhase::TAG_SEARCH;
-                    std::cout << "[Auto] Reached tag handoff waypoint — searching for AprilTag\n";
                 } else {
                     AdvanceToNextSetpoint();
                     RoboClawStopAll();
