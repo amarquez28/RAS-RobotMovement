@@ -120,93 +120,93 @@ static std::vector<Setpoint> Path_Default() {
 
         // ── Approach ──────────────────────────────────────────────────────────
         { 0.54,  0.00,  0.0    },  // [1]  forward 54 cm
-        { 0.54,  0.10,  0.0    },  // [2]  strafe right 10 cm
-        { 0.54,  0.10, -pi_2   },  // [3]  turn right 90°
-        { 1.27,  0.10, -pi_2   },  // [4]  forward 73 cm
-        { 0.94,  0.10, -pi_2   },  // [5]  reverse 33 cm
-        { 0.94,  0.10, -pi_2   },  // [6]  raise arm 4 s  (no movement)
-        { 0.94,  0.10, -pi     },  // [7]  turn right 90°
-        { 0.94,  0.10, -pi     },  // [8]  lower arm 4 s  (no movement) placing beacon
+        { 0.54, -0.10,  0.0    },  // [2]  strafe right 10 cm
+        { 0.54, -0.10, -pi_2   },  // [3]  turn right 90°
+        { 1.27, -0.10, -pi_2   },  // [4]  forward 73 cm
+        { 0.94, -0.10, -pi_2   },  // [5]  reverse 33 cm
+        { 0.94, -0.10, -pi_2   },  // [6]  raise arm 4 s  (no movement)
+        { 0.94, -0.10, -pi     },  // [7]  turn right 90°
+        { 0.94, -0.10, -pi     },  // [8]  lower arm 4 s  (no movement) placing beacon
 
         // ── Lower field sweep ─────────────────────────────────────────────────
-        { 0.94, -0.23, -pi     },  // [9]  left 33 cm
-        { 1.11, -0.23, -pi     },  // [10] forward 17 cm
-        { 0.85, -0.23, -pi     },  // [11] reverse 26 cm
-        { 0.85, -0.06, -pi     },  // [12] right 17 cm
-        { 1.62, -0.06, -pi     },  // [13] forward 77 cm
-        { 1.62, -0.23, -pi     },  // [14] left 17 cm
-        { 1.95, -0.23, -pi     },  // [15] forward 33 cm
-        { 1.03, -0.23, -pi     },  // [16] reverse 92 cm  ← deposit in bucket
+        { 0.94,  0.23, -pi     },  // [9]  left 33 cm
+        { 1.11,  0.23, -pi     },  // [10] forward 17 cm
+        { 0.85,  0.23, -pi     },  // [11] reverse 26 cm
+        { 0.85,  0.06, -pi     },  // [12] right 17 cm
+        { 1.62,  0.06, -pi     },  // [13] forward 77 cm
+        { 1.62,  0.23, -pi     },  // [14] left 17 cm
+        { 1.95,  0.23, -pi     },  // [15] forward 33 cm
+        { 1.03,  0.23, -pi     },  // [16] reverse 92 cm  ← deposit in bucket
 
         // ── Upper field sweep ─────────────────────────────────────────────────
-        { 1.03,  0.01, -pi     },  // [17] right 24 cm
-        { 1.96,  0.01, -pi     },  // [18] forward 93 cm
-        { 0.86,  0.01, -pi     },  // [19] reverse 110 cm
-        { 0.86,  0.25, -pi     },  // [20] right 24 cm
-        { 1.93,  0.25, -pi     },  // [21] forward 107 cm
-        { 0.86,  0.25, -pi     },  // [22] reverse 107 cm
-        { 0.86,  0.49, -pi     },  // [23] right 24 cm
-        { 1.76,  0.49, -pi     },  // [24] forward 90 cm
-        { 0.86,  0.49, -pi     },  // [25] reverse 90 cm
-        { 0.86,  0.58, -pi     },  // [26] right 9 cm
-        { 1.76,  0.58, -pi     },  // [27] forward 90 cm
-        { 1.01,  0.58, -pi     },  // [28] reverse 75 cm  ← sweep done
+        { 1.03, -0.01, -pi     },  // [17] right 24 cm
+        { 1.96, -0.01, -pi     },  // [18] forward 93 cm
+        { 0.86, -0.01, -pi     },  // [19] reverse 110 cm
+        { 0.86, -0.25, -pi     },  // [20] right 24 cm
+        { 1.93, -0.25, -pi     },  // [21] forward 107 cm
+        { 0.86, -0.25, -pi     },  // [22] reverse 107 cm
+        { 0.86, -0.49, -pi     },  // [23] right 24 cm
+        { 1.76, -0.49, -pi     },  // [24] forward 90 cm
+        { 0.86, -0.49, -pi     },  // [25] reverse 90 cm
+        { 0.86, -0.58, -pi     },  // [26] right 9 cm
+        { 1.76, -0.58, -pi     },  // [27] forward 90 cm
+        { 1.01, -0.58, -pi     },  // [28] reverse 75 cm  ← sweep done
 
         // ── Deposit + transit to cave ─────────────────────────────────────────
-        { 1.01, -0.23, -pi     },  // [29] left 82 cm     ← deposit in bucket
-        { 1.01,  0.17, -pi     },  // [30] right 41 cm
-        { 2.89,  0.17, -pi     },  // [31] forward 188 cm
+        { 1.01,  0.23, -pi     },  // [29] left 82 cm     ← deposit in bucket
+        { 1.01, -0.17, -pi     },  // [30] right 41 cm
+        { 2.89, -0.17, -pi     },  // [31] forward 188 cm
 
         // ── Bucket grab sequence ──────────────────────────────────────────────
-        { 2.81,  0.17, -pi     },  // [32] reverse 8 cm
-        { 2.81,  0.17, -pi_2   },  // [33] turn left 90°
-        { 2.56,  0.17, -pi_2   },  // [34] reverse 25 cm
-        { 2.56,  0.34, -pi_2   },  // [35] strafe right 17 cm
-        { 2.56,  0.34, -pi_2   },  // [36] grab bucket (no movement) ← call GrabBucket()
-        { 2.71,  0.34, -pi_2   },  // [37] forward 15 cm
-        { 2.96,  0.34, -pi_2   },  // [38] forward 25 cm
-        { 3.21,  0.34, -pi_2   },  // [39] forward 25 cm
-        { 3.46,  0.34, -pi_2   },  // [40] forward 25 cm ← TAG_SEARCH handoff
+        { 2.81, -0.17, -pi     },  // [32] reverse 8 cm
+        { 2.81, -0.17, -pi_2   },  // [33] turn left 90°
+        { 2.56, -0.17, -pi_2   },  // [34] reverse 25 cm
+        { 2.56, -0.34, -pi_2   },  // [35] strafe right 17 cm
+        { 2.56, -0.34, -pi_2   },  // [36] grab bucket (no movement) ← call GrabBucket()
+        { 2.71, -0.34, -pi_2   },  // [37] forward 15 cm
+        { 2.96, -0.34, -pi_2   },  // [38] forward 25 cm
+        { 3.21, -0.34, -pi_2   },  // [39] forward 25 cm
+        { 3.46, -0.34, -pi_2   },  // [40] forward 25 cm ← TAG_SEARCH handoff
 
         // ── Cave april tag ────────────────────────────────────────────────────
-        { 2.48,  0.17, -pi           },  // [41] reverse 41 cm — enter cave
-        { 2.48,  0.17, -3.0*pi/2.0   },  // [42] turn left 90°
-        { 2.48,  0.13, -3.0*pi/2.0   },  // [43] left 4 cm         (y motor)
+        { 2.48, -0.17, -pi           },  // [41] reverse 41 cm — enter cave
+        { 2.48, -0.17, -3.0*pi/2.0   },  // [42] turn left 90°
+        { 2.48, -0.13, -3.0*pi/2.0   },  // [43] left 4 cm         (y motor)
 
-        { 2.88,  0.13, -3.0*pi/2.0   },  // [44] forward 40 cm     (x motor) probe
-        { 2.48,  0.13, -3.0*pi/2.0   },  // [45] reverse 40 cm
-        { 2.48,  0.38, -3.0*pi/2.0   },  // [46] right 25 cm       (y motor)
-        { 2.88,  0.38, -3.0*pi/2.0   },  // [47] forward 40 cm     probe
-        { 2.48,  0.38, -3.0*pi/2.0   },  // [48] reverse 40 cm
-        { 2.48,  0.57, -3.0*pi/2.0   },  // [49] right 19 cm       (y motor)
-        { 2.88,  0.57, -3.0*pi/2.0   },  // [50] forward 40 cm     probe
-        { 2.48,  0.57, -3.0*pi/2.0   },  // [51] reverse 40 cm
+        { 2.88, -0.13, -3.0*pi/2.0   },  // [44] forward 40 cm     (x motor) probe
+        { 2.48, -0.13, -3.0*pi/2.0   },  // [45] reverse 40 cm
+        { 2.48, -0.38, -3.0*pi/2.0   },  // [46] right 25 cm       (y motor)
+        { 2.88, -0.38, -3.0*pi/2.0   },  // [47] forward 40 cm     probe
+        { 2.48, -0.38, -3.0*pi/2.0   },  // [48] reverse 40 cm
+        { 2.48, -0.57, -3.0*pi/2.0   },  // [49] right 19 cm       (y motor)
+        { 2.88, -0.57, -3.0*pi/2.0   },  // [50] forward 40 cm     probe
+        { 2.48, -0.57, -3.0*pi/2.0   },  // [51] reverse 40 cm
 
-        { 2.48,  0.16, -3.0*pi/2.0   },  // [52] left 41 cm        (y motor) return to center
-        { 2.48,  0.16, -pi_2          },  // [53] 180° in place
-        { 2.48,  0.20, -pi_2          },  // [54] right 4 cm        (y motor)
+        { 2.48, -0.16, -3.0*pi/2.0   },  // [52] left 41 cm        (y motor) return to center
+        { 2.48, -0.16, -pi_2          },  // [53] 180° in place
+        { 2.48, -0.20, -pi_2          },  // [54] right 4 cm        (y motor)
 
-        { 2.88,  0.20, -pi_2          },  // [55] forward 40 cm     probe
-        { 2.48,  0.20, -pi_2          },  // [56] reverse 40 cm
-        { 2.48, -0.05, -pi_2          },  // [57] left 25 cm        (y motor)
-        { 2.88, -0.05, -pi_2          },  // [58] forward 40 cm     probe
-        { 2.48, -0.05, -pi_2          },  // [59] reverse 40 cm
-        { 2.48, -0.24, -pi_2          },  // [60] left 19 cm        (y motor)
-        { 2.88, -0.24, -pi_2          },  // [61] forward 40 cm     probe
-        { 2.48, -0.24, -pi_2          },  // [62] reverse 40 cm
+        { 2.88, -0.20, -pi_2          },  // [55] forward 40 cm     probe
+        { 2.48, -0.20, -pi_2          },  // [56] reverse 40 cm
+        { 2.48,  0.05, -pi_2          },  // [57] left 25 cm        (y motor)
+        { 2.88,  0.05, -pi_2          },  // [58] forward 40 cm     probe
+        { 2.48,  0.05, -pi_2          },  // [59] reverse 40 cm
+        { 2.48,  0.24, -pi_2          },  // [60] left 19 cm        (y motor)
+        { 2.88,  0.24, -pi_2          },  // [61] forward 40 cm     probe
+        { 2.48,  0.24, -pi_2          },  // [62] reverse 40 cm
 
-        { 2.48, -0.19, -pi_2          },  // [63] right 5 cm        (y motor)
-        { 2.48, -0.19, -pi            },  // [64] turn right 90°
-        { 4.28, -0.19, -pi            },  // [65] forward 180 cm    ← exit cave
-        { 4.28, -0.19,  0.0           },  // [66] 180° turn (now facing +x)
-        { 5.28, -0.19,  0.0           },  // [67] forward 100 cm     (+x)
-        { 5.28, -0.19, -pi_2          },  // [68] turn right 90°
-        { 5.03, -0.19, -pi_2          },  // [69] reverse 25 cm      (-x) — grab bucket
-        { 5.28, -0.19, -pi_2          },  // [70] forward 25 cm      (+x)
-        { 5.28,  0.21, -pi_2          },  // [71] strafe right 40 cm (+y)
-        { 5.28,  0.21, -pi            },  // [72] turn right 90°
-        { 5.28, -0.22, -pi            },  // [73] left strafe 43 cm  (-y)
-        { 4.98, -0.22, -pi            },  // [74] reverse 30 cm      (-x)
+        { 2.48,  0.19, -pi_2          },  // [63] right 5 cm        (y motor)
+        { 2.48,  0.19, -pi            },  // [64] turn right 90°
+        { 4.28,  0.19, -pi            },  // [65] forward 180 cm    ← exit cave
+        { 4.28,  0.19,  0.0           },  // [66] 180° turn (now facing +x)
+        { 5.28,  0.19,  0.0           },  // [67] forward 100 cm     (+x)
+        { 5.28,  0.19, -pi_2          },  // [68] turn right 90°
+        { 5.03,  0.19, -pi_2          },  // [69] reverse 25 cm      (-x) — grab bucket
+        { 5.28,  0.19, -pi_2          },  // [70] forward 25 cm      (+x)
+        { 5.28, -0.21, -pi_2          },  // [71] strafe right 40 cm
+        { 5.28, -0.21, -pi            },  // [72] turn right 90°
+        { 5.28,  0.22, -pi            },  // [73] left strafe 43 cm
+        { 4.98,  0.22, -pi            },  // [74] reverse 30 cm      (-x)
     };
 }
 
