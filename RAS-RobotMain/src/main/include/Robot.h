@@ -170,13 +170,11 @@ class Robot : public frc::TimesliceRobot {
   static constexpr int kHallServoInitPos    = 500;   // Closed
   static constexpr int kHallServoOpenPos    = 1500;  // Open
   static constexpr int BrushServoInitPos    = 500;
-  static constexpr int BrushServoOpenPos    = 1500;
-  static constexpr int ArmServoInitPos      = 700;
-  static constexpr int ArmServoOpenPos      = 1100;
+  static constexpr int BrushServoOpenPos    = 2500;
+  static constexpr int ArmServoInitPos      = 900;
+  static constexpr int ArmServoOpenPos      = 2000;
   static constexpr int ReleaseServoInitPos  = 500;
   static constexpr int ReleaseServoOpenPos  = 1500;
-
-  bool m_armRaisedAuto = false;
 
   // ── IMU (MPU-6050 on I²C onboard port, addr 0x68) ──────────────────────
   frc::I2C m_imu{frc::I2C::Port::kOnboard, 0x68};

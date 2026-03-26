@@ -509,8 +509,6 @@ void Robot::AutonomousInit() {
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
     // Raise arm immediately so beacon clears the arena during early turns
-    m_armRaisedAuto = false;
-    m_autoStartTime = frc::Timer::GetFPGATimestamp();
     ArmLower();
 
     // Safety stop
@@ -539,18 +537,11 @@ void Robot::AutonomousInit() {
 
 void Robot::AutonomousPeriodic() {
     // ── 1. Raise Arm  ──────────────────────────────────────────────────
-    // if (!m_armRaisedAuto &&
-    // (frc::Timer::GetFPGATimestamp() - m_autoStartTime > 2_s)) {
-    // ArmRaise();
-    // m_armRaisedAuto = true;
-    // }
-    if(m_currentSetpointIndex == 0){
-        m_servoArm.SetPulseWidth(1100);
-        m_servoCommandTime = m_timer.Get();
-    }
-    if(m_servoCommandTime.value() >= 0 && (m_timer.Get() - m_servoCommandTime).value() >= kServoDwell_s){
-        m_servoCommandTime = -1_s;
-        AdvanceToNextSetpoint();
+    static units::second_t lastServoUpdate = 0_s;
+
+    if (frc::Timer::GetFPGATimestamp() - lastServoUpdate > 50_ms) {
+        m_servoArm.SetPulseWidth(ArmServoOpenPos);
+        lastServoUpdate = frc::Timer::GetFPGATimestamp();
     }
     // ── 2. Vision connection heartbeat ────────────────────────────────────
     // IsConnected() must be called every tick (it compares heartbeat counters).
