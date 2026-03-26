@@ -275,7 +275,10 @@ double Robot::WrapAngle(double angle) {
 
 void Robot::LoadAutonomousSetpoints() {
   m_setpoints = {
-    {0.0, 0.40, 0.0}
+    {0.5, 0.0, 0.0},
+    {0.5, 0.1, 0.0},
+    {0.5, 0.1, std::numbers::pi/2},
+    {0.5, 0.1, std::numbers::pi}
   };
 
   m_currentSetpointIndex = 0;
@@ -316,6 +319,7 @@ void Robot::AutonomousInit() {
   m_thetaRad = 0.0;
   m_firstPidLoop = true;
   CalibrateGyroZBias();
+  RoboClawStopAll();
 }
 
 static void InitIMU() {
@@ -517,11 +521,11 @@ void Robot::AutonomousPeriodic() {
   double theta_derivative = (theta_error - theta_prevError) / dt;
   
   //Gain Scheduling
-  //double abs_theta_error = std::abs(theta_error);
-            //double sched_kP  = 20.0;
-            //if      (abs_theta_error > std::numbers::pi / 4)  sched_kP = 80.0;
-            //else if (abs_theta_error > std::numbers::pi / 12) sched_kP = 40.0;
-    double sched_kP = 0.0;
+  double abs_theta_error = std::abs(theta_error);
+    double sched_kP  = 20.0;
+    if      (abs_theta_error > std::numbers::pi / 4)  sched_kP = 80.0;
+    else if (abs_theta_error > std::numbers::pi / 12) sched_kP = 40.0;
+
   // PID controller
   double x_controller = x_kP * x_error_meters + x_kI * x_integral + x_kD * x_derivative;
   double y_controller = y_kP * y_error_meters + y_kI * y_integral + y_kD * y_derivative;
@@ -539,24 +543,27 @@ void Robot::AutonomousPeriodic() {
   theta_prevError = theta_error;
 
   // Tolerance
-  double x_tolerance = 0.005;
-  double y_tolerance = 0.005;
-  double theta_tolerance = 0.02;
+  double x_tolerance = 0.001;
+  double y_tolerance = 0.001;
+  double theta_tolerance = 0.015;
 
   if (std::abs(x_error_meters) <= x_tolerance) {
     x_controller = 0.0;
     x_integral = 0.0;
     x_prevError = 0.0;
+    x_derivative = 0.0;
   }
   if (std::abs(y_error_meters) <= y_tolerance) {
     y_controller = 0.0;
     y_integral = 0.0;
     y_prevError = 0.0;
+    y_derivative = 0.0;
     } 
   if (std::abs(theta_error) <= theta_tolerance) {
     theta_controller = 0.0;
     theta_integral = 0.0;
     theta_prevError = 0.0;
+    theta_derivative = 0.0;
   }
 
   //At target logic
