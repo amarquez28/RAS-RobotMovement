@@ -271,7 +271,7 @@ class Robot : public frc::TimesliceRobot {
   // TODO: measure and set these pulse widths on real hardware (μs, 500–2500)
   static constexpr int kArmServoGrabPos   = 500;  // TODO: closed/clamped position
   static constexpr int kArmServoDropPos   = 1200; // TODO: open/release position
-  static constexpr int kArmServoBeaconPos = 1000; // TODO: beacon-deposit angle (may equal drop)
+  static constexpr int kArmServoBeaconPos = 1200; // TODO: beacon-deposit angle (may equal drop)
 
   // ── Test routines ────────────────────────────────────────────────────────
   // Call from TestInit()/TestPeriodic() to verify hardware before a match.

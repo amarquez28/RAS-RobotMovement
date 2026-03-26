@@ -538,6 +538,11 @@ void Robot::AutonomousInit() {
 // ============================================================================
 
 void Robot::AutonomousPeriodic() {
+    static bool armRaised = false;
+    if(!armRaised){
+        ArmRaise();
+        armRaised = true;
+    }
     // ── 1. Update sensors ──────────────────────────────────────────────────
     //UpdateEncoders();
 
