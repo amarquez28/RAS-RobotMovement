@@ -449,7 +449,6 @@ void Robot::RobotPeriodic() {
 
     // IMU dashboard (non-integrated values for debugging)
     IMUDashboard();
-    m_servoArm.SetPulseWidth(ArmServoInitPos);
 }
 
 // ============================================================================
@@ -510,8 +509,9 @@ void Robot::AutonomousInit() {
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
     // Raise arm immediately so beacon clears the arena during early turns
-    m_servoArm.SetPulseWidth(ArmServoOpenPos);
-    ArmRaise();
+    m_armRaisedAuto = false;
+    m_autoStartTime = frc::Timer::GetFPGATimestamp();
+    ArmLower();
 
     // Safety stop
     RoboClawStopAll();
@@ -538,14 +538,12 @@ void Robot::AutonomousInit() {
 // ============================================================================
 
 void Robot::AutonomousPeriodic() {
-    static bool armRaised = false;
-    if(!armRaised){
-        ArmRaise();
-        armRaised = true;
-    }
-    // ── 1. Update sensors ──────────────────────────────────────────────────
-    //UpdateEncoders();
-
+    // ── 1. Raise Arm  ──────────────────────────────────────────────────
+    if (!m_armRaisedAuto &&
+    (frc::Timer::GetFPGATimestamp() - m_autoStartTime > 2_s)) {
+    ArmRaise();
+    m_armRaisedAuto = true;
+}
     // ── 2. Vision connection heartbeat ────────────────────────────────────
     // IsConnected() must be called every tick (it compares heartbeat counters).
     bool visionConnected = m_aprilTagReader.IsConnected();
@@ -903,8 +901,8 @@ void Robot::GrabBucket() {
 // and again just before the deposit waypoint.
 // TODO: tune kArmServoBeaconPos (currently 1000 μs) for the right release angle.
 void Robot::ArmRaise() {
-    m_servoArm.SetPulseWidth(kArmServoBeaconPos);
-    std::cout << "[Mechanism] ArmRaise — arm up (" << kArmServoBeaconPos << " μs)\n";
+    m_servoArm.SetPulseWidth(ArmServoOpenPos);
+    std::cout << "[Mechanism] ArmRaise — arm up (" << ArmServoOpenPos << " μs)\n";
 }
 
 // ArmLower – return the arm to the init/resting position after deposit.
@@ -953,7 +951,7 @@ void Robot::TestInit() {
 
 
 void Robot::TestPeriodic() {
-   
+
 }
 
 

@@ -65,6 +65,8 @@ class Robot : public frc::TimesliceRobot {
   void DriveTankSteered(int8_t baseSpeed, double pixelError);
 
  private:
+   units::second_t m_autoStartTime{0_s};
+
   // ── SmartDashboard / auto chooser ───────────────────────────────────────
   frc::SendableChooser<std::string> m_chooser;
   std::string m_autoSelected;
@@ -166,10 +168,12 @@ class Robot : public frc::TimesliceRobot {
   static constexpr int kHallServoOpenPos    = 1500;  // Open
   static constexpr int BrushServoInitPos    = 500;
   static constexpr int BrushServoOpenPos    = 1500;
-  static constexpr int ArmServoInitPos      = 500;
-  static constexpr int ArmServoOpenPos      = 1200;
+  static constexpr int ArmServoInitPos      = 700;
+  static constexpr int ArmServoOpenPos      = 1100;
   static constexpr int ReleaseServoInitPos  = 500;
   static constexpr int ReleaseServoOpenPos  = 1500;
+
+  bool m_armRaisedAuto = false;
 
   // ── IMU (MPU-6050 on I²C onboard port, addr 0x68) ──────────────────────
   frc::I2C m_imu{frc::I2C::Port::kOnboard, 0x68};
@@ -267,11 +271,6 @@ class Robot : public frc::TimesliceRobot {
   void ArmRaise     ();  // Raise arm to beacon-drop angle (clears arena during turns)
   void ArmLower     ();  // Lower arm back to init position after beacon is deposited
   void DepositOres  ();  // Extend actuator at full speed to push all ores out
-
-  // TODO: measure and set these pulse widths on real hardware (μs, 500–2500)
-  static constexpr int kArmServoGrabPos   = 500;  // TODO: closed/clamped position
-  static constexpr int kArmServoDropPos   = 1200; // TODO: open/release position
-  static constexpr int kArmServoBeaconPos = 1200; // TODO: beacon-deposit angle (may equal drop)
 
   // ── Test routines ────────────────────────────────────────────────────────
   // Call from TestInit()/TestPeriodic() to verify hardware before a match.
