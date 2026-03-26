@@ -129,10 +129,10 @@ class Robot : public frc::TimesliceRobot {
   static constexpr double kServoDwell_s = 1.0;
 
   // PID Tuning gains
-  double x_kP = 95.0;
+  double x_kP = 105.0;
   double x_kI = 19.0;
   double x_kD = 0.8;
-  double y_kP = 300.0;
+  double y_kP = 500.0;
   double y_kI = 55.0;
   double y_kD = 0.01;
   double theta_kI = 5.0;
