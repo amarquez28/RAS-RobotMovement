@@ -172,7 +172,7 @@ class Robot : public frc::TimesliceRobot {
   static constexpr size_t kTagHandoffWaypoint = 10;
 
   // How long to search for a tag before giving up and going to DONE.
-  static constexpr double kTagSearchTimeout_s = 5.0; 
+  static constexpr double kTagSearchTimeout_s = 30.0; 
 
   // Servo pulse widths (microseconds)
   static constexpr int kHallServoInitPos    = 500;   // Closed

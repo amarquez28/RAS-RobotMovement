@@ -637,32 +637,116 @@ void Robot::AutonomousPeriodic() {
         bool tagFound = hasTag;
         if (tagFound) {
             tagId = m_aprilTagReader.GetPrimaryTag().id;
+            // Tag found — load the corresponding path, reset pose, start running
+            std::cout << "[Auto] Tag ID " << tagId << " detected — loading sub-path\n";
+            m_setpoints = AutonomousPaths::GetPath(tagId);
+            m_currentSetpointIndex = 0;
+            m_autoComplete = m_setpoints.empty();
+            ResetPidState();
+            RoboClawResetAllEncoders();
+            m_vertTicks  = 0;
+            m_horizTicks = 0;
+            m_autoPhase  = AutoPhase::APPROACH;
+            frc::SmartDashboard::PutNumber("Auto/TagId", tagId);
+        }
+        else{
+            //this is assuming the robot has the camera facing out the cave
+            //we will drive straight until we can see the april tag
+            //then when we see the april tag our new target will be the tag.distance - (comfortable distance away from tag to start bucket movement sequence)
+            double x_target     = -30.0;
+            double y_target     = -0.0;
+            double theta_target = 0.0;
+            double x_error     = x_target - x_pos;
+            double y_error     = y_target - y_pos;
+            double theta_error = WrapAngle(theta_target - m_thetaRad);
+            x_integral     += x_error     * dt;
+            y_integral     += y_error     * dt;
+            theta_integral += theta_error * dt;
+            double x_deriv     = (x_error     - x_prevError)     / dt;
+            double y_deriv     = (y_error     - y_prevError)     / dt;
+            double theta_deriv = (theta_error - theta_prevError) / dt;
+            double abs_theta = std::abs(theta_error);
+            double sched_kP  = 25.0;
+            if (abs_theta > std::numbers::pi / 4)
+                sched_kP = 80.0;
+            else if (abs_theta > std::numbers::pi / 12)
+                sched_kP = 40.0;
+
+            double x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv;
+            double y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv;
+            double theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv;
+            if (std::abs(x_cmd)     > 127.0) { x_integral     -= x_error     * dt; x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv; }
+            if (std::abs(y_cmd)     > 127.0) { y_integral     -= y_error     * dt; y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv; }
+            if (std::abs(theta_cmd) >  80.0) { theta_integral -= theta_error * dt; theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv; }
+            x_prevError     = x_error;
+            y_prevError     = y_error;
+            theta_prevError = theta_error;
+            constexpr double kXTol     = 0.002;
+            constexpr double kYTol     = 0.002;
+            constexpr double kThetaTol = 0.05; // ~3° — tight enough for accuracy, wide enough to settle
+            if (std::abs(x_error) <= kXTol)
+            {
+                x_cmd = 0.0;
+                x_integral = 0.0;
+                x_prevError = 0.0;
+                x_deriv = 0.0;
+            }
+            if (std::abs(y_error) <= kYTol)
+            {
+                y_cmd = 0.0;
+                y_integral = 0.0;
+                y_prevError = 0.0;
+                y_deriv = 0.0;
+            }
+            if (std::abs(theta_error) <= kThetaTol)
+            {
+                theta_cmd = 0.0;
+                theta_integral = 0.0;
+                theta_prevError = 0.0;
+                theta_deriv = 0.0;
+            }
+
+            bool x_done     = (std::abs(x_error)     <= kXTol);
+            bool y_done     = (std::abs(y_error)     <= kYTol);
+            bool theta_done = (std::abs(theta_error) <= kThetaTol);
+            x_cmd     = std::clamp(x_cmd,     -127.0, 127.0);
+            y_cmd     = std::clamp(y_cmd,     -127.0, 127.0);
+            theta_cmd = std::clamp(theta_cmd,  -80.0,  80.0);
+
+            // Minimum command (deadband kick) outside tolerance only
+            if (theta_cmd > 0.0 && theta_cmd < 15.0) theta_cmd = 15.0;
+            if (theta_cmd < 0.0 && theta_cmd > -15.0) theta_cmd = -15.0;
+            if (y_cmd > 0.0 && y_cmd < 25.0) y_cmd = 25.0;
+            if (y_cmd < 0.0 && y_cmd > -25.0) y_cmd = -25.0;
+
+            // Differential mixing for drive wheels
+            double xr_cmd = std::clamp(x_cmd + theta_cmd, -127.0, 127.0);
+            double xl_cmd = std::clamp(x_cmd - theta_cmd, -127.0, 127.0);
+            if (xr_cmd > 0.0 && xr_cmd < 25.0) xr_cmd = 25.0;
+            if (xr_cmd < 0.0 && xr_cmd > -25.0) xr_cmd = -25.0;
+            if (xl_cmd > 0.0 && xl_cmd < 25.0) xl_cmd = 25.0;
+            if (xl_cmd < 0.0 && xl_cmd > -25.0) xl_cmd = -25.0;
+
+            double spdr = std::abs(xr_cmd);
+            double spdl = std::abs(xl_cmd);
+            double spdy = std::abs(y_cmd);
+             // Right drive (M1 on 0x80)
+            if      (xr_cmd > 0.0) RoboClawM1Forward (kRoboClawAddr_Drive, static_cast<uint8_t>(spdr));
+            else if (xr_cmd < 0.0) RoboClawM1Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdr));
+            else                   RoboClawM1Forward  (kRoboClawAddr_Drive, 0);
+
+            // Left drive (M2 on 0x80)
+            if      (xl_cmd > 0.0) RoboClawM2Forward (kRoboClawAddr_Drive, static_cast<uint8_t>(spdl));
+            else if (xl_cmd < 0.0) RoboClawM2Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdl));
+            else                   RoboClawM2Forward  (kRoboClawAddr_Drive, 0);
+
+            // Strafe (M1 on 0x81)
+            if      (y_cmd > 0.0) RoboClawM1Forward (kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
+            else if (y_cmd < 0.0) RoboClawM1Backward(kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
+            else                  RoboClawM1Forward  (kRoboClawAddr_Strafe, 0);
+
         }
 
-        bool timedOut = (searchElapsed >= kTagSearchTimeout_s);
-
-        if (!tagFound && !timedOut) {
-            break; // still searching
-        }
-
-        if (timedOut && !tagFound) {
-            std::cout << "[Auto] Tag search timed out — going to DONE\n";
-            frc::SmartDashboard::PutString("Auto/Phase", "Done (tag timeout)");
-            m_autoPhase = AutoPhase::DONE;
-            break;
-        }
-
-        // Tag found — load the corresponding path, reset pose, start running
-        std::cout << "[Auto] Tag ID " << tagId << " detected — loading sub-path\n";
-        m_setpoints = AutonomousPaths::GetPath(tagId);
-        m_currentSetpointIndex = 0;
-        m_autoComplete = m_setpoints.empty();
-        ResetPidState();
-        RoboClawResetAllEncoders();
-        m_vertTicks  = 0;
-        m_horizTicks = 0;
-        m_autoPhase  = AutoPhase::APPROACH;
-        frc::SmartDashboard::PutNumber("Auto/TagId", tagId);
         break;
     }
 
@@ -673,46 +757,50 @@ void Robot::AutonomousPeriodic() {
     case AutoPhase::CENTERING: {
         frc::SmartDashboard::PutString("Auto/Phase", "Centering");
 
-        // Timeout safety: if we can't center in time, start the path anyway
-        if (m_timer.Get().value() >= kTagSearchTimeout_s) {
-            StopAllDrive();
-            RoboClawResetAllEncoders();
-            m_thetaRad     = 0.0;
-            m_yaw_rad      = 0.0;
-            m_firstPidLoop = true;
-            ResetPidState();
-            m_autoPhase = AutoPhase::APPROACH;
-            std::cout << "[Auto] Centering timed out — starting path from current position\n";
-            break;
-        }
-
-        if (!hasTag) {
-            StopAllDrive();
-            frc::SmartDashboard::PutString("Auto/Phase", "Centering (no tag)");
-            break;
-        }
-
-        double pixelError = tag.x - kCameraCenter_px;
-        frc::SmartDashboard::PutNumber("Auto/CenterError_px", pixelError);
-
-        if (std::abs(pixelError) <= kCenterTolerance_px) {
-            // Centered — lock lateral position, reset all odometry, start path
-            StopAllDrive();
-            RoboClawResetAllEncoders();
-            m_thetaRad     = 0.0;
-            m_yaw_rad      = 0.0;
-            m_firstPidLoop = true;
-            ResetPidState();
-            m_autoPhase = AutoPhase::APPROACH;
-            std::cout << "[Auto] Centered (error=" << pixelError << "px) — starting path\n";
-        } else {
-            // Strafe toward tag center.
-            // If pixelError > 0 (tag is RIGHT of center) → strafe right (+speed).
-            // Flip sign here if the robot strafes the wrong way.
-            int8_t strafeSpeed = (pixelError > 0) ? static_cast<int8_t>(kCenterSpeed)
-                                                   : static_cast<int8_t>(-kCenterSpeed);
+        // // Timeout safety: if we can't center in time, start the path anyway
+        // if (m_timer.Get().value() >= kTagSearchTimeout_s) {
+        //     StopAllDrive();
+        //     RoboClawResetAllEncoders();
+        //     m_thetaRad     = 0.0;
+        //     m_yaw_rad      = 0.0;
+        //     m_firstPidLoop = true;
+        //     ResetPidState();
+        //     m_autoPhase = AutoPhase::APPROACH;
+        //     std::cout << "[Auto] Centering timed out — starting path from current position\n";
+        //     break;
+        // }
+        //keep driving right until we see an april tag
+        if(!hasTag){
+            int8_t strafeSpeed = static_cast<int8_t>(kCenterSpeed);
             DriveHorizontal(strafeSpeed);
         }
+        else{
+            double pixelError = tag.x - kCameraCenter_px;
+            frc::SmartDashboard::PutNumber("Auto/CenterError_px", pixelError);
+
+            if (std::abs(pixelError) <= kCenterTolerance_px)
+            {
+                // Centered — lock lateral position, reset all odometry, start path
+                StopAllDrive();
+                RoboClawResetAllEncoders();
+                m_thetaRad = 0.0;
+                m_yaw_rad = 0.0;
+                m_firstPidLoop = true;
+                ResetPidState();
+                m_autoPhase = AutoPhase::APPROACH;
+                std::cout << "[Auto] Centered (error=" << pixelError << "px) — starting path\n";
+            }
+            else
+            {
+                // Strafe toward tag center.
+                // If pixelError > 0 (tag is RIGHT of center) → strafe right (+speed).
+                // Flip sign here if the robot strafes the wrong way.
+                int8_t strafeSpeed = (pixelError > 0) ? static_cast<int8_t>(kCenterSpeed)
+                                                      : static_cast<int8_t>(-kCenterSpeed);
+                DriveHorizontal(strafeSpeed);
+            }
+        }
+
         break;
     }
 
