@@ -508,6 +508,9 @@ void Robot::AutonomousInit() {
     // Close hatch door
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
+    // Raise arm immediately so beacon clears the arena during early turns
+    ArmRaise();
+
     // Safety stop
     RoboClawStopAll();
 
@@ -768,10 +771,9 @@ void Robot::AutonomousPeriodic() {
 
                 // ── Mechanism actions on waypoint completion ──────────────────
                 // Fires once when the robot finishes the listed waypoint index.
-                if (m_currentSetpointIndex == 5) {
-                    // Completed reverse-33cm approach — raise arm to beacon position
-                    // before the robot executes the hold at [6] and turns at [7].
-                    DepositBeacon();
+                if (m_currentSetpointIndex == 8) {
+                    // Completed turn + hold — lower arm back down after beacon deposit.
+                    ArmLower();
                 }
 
                 // ── Path / TAG_SEARCH handoff ─────────────────────────────────
@@ -889,11 +891,19 @@ void Robot::GrabBucket() {
     m_servoArm.SetPulseWidth(pw);
 }
 
-// DepositBeacon – raise the arm to the beacon-drop angle so the beacon
-// detaches and falls into the goal zone.
+// ArmRaise – raise the arm to the beacon-drop angle.
+// Call at autonomous start so the beacon clears the arena during early turns,
+// and again just before the deposit waypoint.
 // TODO: tune kArmServoBeaconPos (currently 1000 μs) for the right release angle.
-void Robot::DepositBeacon() {
+void Robot::ArmRaise() {
     m_servoArm.SetPulseWidth(kArmServoBeaconPos);
+    std::cout << "[Mechanism] ArmRaise — arm up (" << kArmServoBeaconPos << " μs)\n";
+}
+
+// ArmLower – return the arm to the init/resting position after deposit.
+void Robot::ArmLower() {
+    m_servoArm.SetPulseWidth(ArmServoInitPos);
+    std::cout << "[Mechanism] ArmLower — arm down (" << ArmServoInitPos << " μs)\n";
 }
 
 // DepositOres – extend the linear actuator at full speed for kActuatorRunTime_s

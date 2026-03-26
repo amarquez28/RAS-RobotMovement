@@ -264,7 +264,8 @@ class Robot : public frc::TimesliceRobot {
   // ── Bucket / beacon mechanisms ───────────────────────────────────────────
   // Only m_servoArm is used in the non-sorting system.
   void GrabBucket   ();  // Raise arm then clamp onto collection bucket
-  void DepositBeacon();  // Raise arm to beacon-drop angle; beacon detaches
+  void ArmRaise     ();  // Raise arm to beacon-drop angle (clears arena during turns)
+  void ArmLower     ();  // Lower arm back to init position after beacon is deposited
   void DepositOres  ();  // Extend actuator at full speed to push all ores out
 
   // TODO: measure and set these pulse widths on real hardware (μs, 500–2500)
