@@ -422,6 +422,10 @@ void Robot::ResetPidState() {
     x_prevError     = 0.0;
     y_prevError     = 0.0;
     theta_prevError = 0.0;
+
+    x_deriv = 0.0;
+    y_deriv = 0.0;
+    theta_deriv = 0.0;
 }
 
 // ============================================================================
@@ -460,10 +464,7 @@ void Robot::AutonomousInit() {
     m_timer.Start();
 
     // Reset all encoders to zero so dead-reckoning is relative to start pos
-    RoboClawDrain();
     RoboClawResetAllEncoders();
-    RoboClawStopAll();
-    ResetPidState();
 
     // Re-init IMU in case of a power cycle between runs
     IMUInit();
@@ -515,6 +516,7 @@ void Robot::AutonomousInit() {
 
     // Safety stop
     RoboClawStopAll();
+    RoboClawDrain();
 
     std::cout << "[Auto] AutonomousInit complete\n";
 }
@@ -945,12 +947,42 @@ void Robot::DisabledPeriodic() {}
 
 
 void Robot::TestInit() {
-
+    m_testStep = 0;
+    m_timer.Reset();
+    m_timer.Start();
 }
 
 
 void Robot::TestPeriodic() {
+    double t = m_timer.Get().value();
 
+    switch (m_testStep)
+    {
+    case 0:
+        ActuatorExtend(kActuatorSpeed);
+        m_testStep = 1;
+        break;
+    case 1:
+        if(t >= kActuatorRunTime_s){
+            ActuatorStop();
+            m_timer.Reset();
+            m_timer.Start();
+            m_testStep = 2;
+        }
+        break;
+    case 2:
+        ActuatorRetract(kActuatorSpeed);
+        m_testStep = 3;
+        break;
+    case 3:
+        if(t >= kActuatorRunTime_s){
+            ActuatorStop();
+            m_testStep = 4;
+        }
+        break;
+    default:
+        break;
+    }
 }
 
 

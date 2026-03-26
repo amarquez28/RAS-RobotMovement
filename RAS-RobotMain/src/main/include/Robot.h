@@ -129,23 +129,26 @@ class Robot : public frc::TimesliceRobot {
   static constexpr double kServoDwell_s = 1.0;
 
   // PID Tuning gains
-  double x_kP = 105.0;
+  double x_kP = 95.0;
   double x_kI = 19.0;
   double x_kD = 0.8;
-  double y_kP = 650.0;
-  double y_kI = 65.0;
+  double y_kP = 400.0;
+  double y_kI = 55.0;
   double y_kD = 0.0;
   double theta_kI = 5.0;
   double theta_kD = 0.3;
   // Forward/Backward wheel PID state
   double x_integral = 0.0;
   double x_prevError = 0.0;
+  double x_deriv = 0.0;
   // Strafe wheel PID state
   double y_integral = 0.0;
   double y_prevError = 0.0;
+  double y_deriv = 0.0;
   // Theta PID state
   double theta_integral  = 0.0;
   double theta_prevError = 0.0;
+  double theta_deriv = 0.0;
   // Gyro bias (rad/s) – measured during CalibrateGyroZBias() in AutonomousInit
   double m_gyroZBiasRadps = 0.0;
 
