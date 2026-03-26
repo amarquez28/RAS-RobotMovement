@@ -787,8 +787,8 @@ void Robot::AutonomousPeriodic() {
             // Minimum command (deadband kick) outside tolerance only
             if (theta_cmd > 0.0 && theta_cmd < 15.0) theta_cmd = 15.0;
             if (theta_cmd < 0.0 && theta_cmd > -15.0) theta_cmd = -15.0;
-            if (y_cmd > 0.0 && y_cmd < 15.0) y_cmd = 15.0;
-            if (y_cmd < 0.0 && y_cmd > -15.0) y_cmd = -15.0;
+            if (y_cmd > 0.0 && y_cmd < 25.0) y_cmd = 25.0;
+            if (y_cmd < 0.0 && y_cmd > -25.0) y_cmd = -25.0;
 
             // Differential mixing for drive wheels
             double xr_cmd = std::clamp(x_cmd + theta_cmd, -127.0, 127.0);
