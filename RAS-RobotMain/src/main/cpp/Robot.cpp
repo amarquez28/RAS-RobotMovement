@@ -449,6 +449,7 @@ void Robot::RobotPeriodic() {
 
     // IMU dashboard (non-integrated values for debugging)
     IMUDashboard();
+    m_servoArm.SetPulseWidth(ArmServoInitPos);
 }
 
 // ============================================================================
@@ -509,7 +510,7 @@ void Robot::AutonomousInit() {
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
     // Raise arm immediately so beacon clears the arena during early turns
-    m_servoArm.SetPulseWidth(ArmServoInitPos);
+    m_servoArm.SetPulseWidth(ArmServoOpenPos);
     ArmRaise();
 
     // Safety stop
