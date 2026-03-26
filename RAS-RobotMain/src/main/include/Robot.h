@@ -125,6 +125,9 @@ class Robot : public frc::TimesliceRobot {
   rev::servohub::ServoChannel &m_servoHall{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};//hall sensor
   rev::servohub::ServoChannel &m_servoArm{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId5)};//arm
 
+  units::second_t m_servoCommandTime{-1_s};
+  static constexpr double kServoDwell_s = 1.0;
+
   // PID Tuning gains
   double x_kP = 105.0;
   double x_kI = 19.0;
