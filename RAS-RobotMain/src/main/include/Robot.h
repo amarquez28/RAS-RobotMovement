@@ -132,7 +132,7 @@ class Robot : public frc::TimesliceRobot {
   double x_kP = 105.0;
   double x_kI = 19.0;
   double x_kD = 0.8;
-  double y_kP = 700.0;
+  double y_kP = 650.0;
   double y_kI = 65.0;
   double y_kD = 0.0;
   double theta_kI = 5.0;
@@ -172,9 +172,11 @@ class Robot : public frc::TimesliceRobot {
   static constexpr int BrushServoInitPos    = 500;
   static constexpr int BrushServoOpenPos    = 1500;
   static constexpr int ArmServoInitPos      = 500;
-  static constexpr int ArmServoOpenPos      = 2000;
+  static constexpr int ArmServoOpenPos      = 1500;
   static constexpr int ReleaseServoInitPos  = 500;
   static constexpr int ReleaseServoOpenPos  = 1500;
+  bool m_armRaised = false;
+  bool m_armDropped = false;
 
   // ── IMU (MPU-6050 on I²C onboard port, addr 0x68) ──────────────────────
   frc::I2C m_imu{frc::I2C::Port::kOnboard, 0x68};

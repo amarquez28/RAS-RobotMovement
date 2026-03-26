@@ -509,6 +509,8 @@ void Robot::AutonomousInit() {
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
     // Raise arm immediately so beacon clears the arena during early turns
+    m_armRaised = false;
+    m_armDropped = false;
     ArmLower();
 
     // Safety stop
@@ -537,16 +539,17 @@ void Robot::AutonomousInit() {
 
 void Robot::AutonomousPeriodic() {
     // ── 1. Raise Arm  ──────────────────────────────────────────────────
-    static units::second_t lastServoUpdate = 0_s;
+    // Raise arm once at start of autonomous
+    /*if (!m_armRaised) {
+        ArmRaise();
+        m_armRaised = true;
+    }
 
-    if (frc::Timer::GetFPGATimestamp() - lastServoUpdate > 50_ms && m_currentSetpointIndex < 8) {
-        m_servoArm.SetPulseWidth(ArmServoOpenPos);
-        lastServoUpdate = frc::Timer::GetFPGATimestamp();
-    }
-    if (m_currentSetpointIndex == 8)
-    {
+    // Lower arm once when waypoint 8 is reached
+    if (m_currentSetpointIndex >= 8 && !m_armDropped) {
         ArmLower();
-    }
+        m_armDropped = true;
+    }*/
     // ── 2. Vision connection heartbeat ────────────────────────────────────
     // IsConnected() must be called every tick (it compares heartbeat counters).
     bool visionConnected = m_aprilTagReader.IsConnected();
@@ -722,7 +725,7 @@ void Robot::AutonomousPeriodic() {
 
             // Gain scheduling for theta: larger P when heading error is large
             double abs_theta = std::abs(theta_error);
-            double sched_kP  = 20.0;
+            double sched_kP  = 25.0;
             if (abs_theta > std::numbers::pi / 4)
                 sched_kP = 80.0;
             else if (abs_theta > std::numbers::pi / 12)
