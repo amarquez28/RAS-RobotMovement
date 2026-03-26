@@ -62,9 +62,10 @@ struct Setpoint {
 // ── Named constants used across all paths ──────────────────────────────────────
 namespace PathConst {
     inline constexpr double pi     = std::numbers::pi;
-    inline constexpr double pi_2   = std::numbers::pi / 2.0;
-    inline constexpr double pi_4   = std::numbers::pi / 4.0;
-    inline constexpr double two_pi = 2.0 * std::numbers::pi;
+    inline constexpr double pi_2   = std::numbers::pi / 2.0; //90 degrees
+    inline constexpr double pi_4   = std::numbers::pi / 4.0; //45 degrees
+    inline constexpr double pi_6   = std::numbers::pi / 6.0; //30 degrees
+    inline constexpr double two_pi = 2.0 * std::numbers::pi; //360 degrees
 
     // ── Field geometry ──────────────────────────────────────────────────────────
     inline constexpr double FIELD_LENGTH_M = 2.4384;  // 8 ft
@@ -105,10 +106,10 @@ static std::vector<Setpoint> Path_Default() {
     using namespace PathConst;
     return {
         //Path #2
-        {0.34, 0.0, 0.0},
-        {0.68, 0.0, 0.0},
-        {0.38, 0.0, 0.0},
-        {0.38, 0.0, pi_2}
+        {0.5, 0.0, -pi_6},
+        //{0.68, 0.0, 0.0},
+        //{0.38, 0.0, 0.0},
+        //{0.38, 0.0, pi_2}
         // ── Start ─────────────────────────────────────────────────────────────────
         /*{ 0.00,  0.00,   0.0 },   // [0]  start
         { 0.00, -0.15,   0.0 },   // [1]  right 15 cm  (mid: [0]→[1] dy=0.30≥0.05)
