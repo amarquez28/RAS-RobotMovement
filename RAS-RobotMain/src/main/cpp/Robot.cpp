@@ -763,18 +763,24 @@ void Robot::AutonomousPeriodic() {
             bool theta_done = (std::abs(theta_error) <= kThetaTol);
 
             if (x_done && y_done && theta_done) {
-                // Check if this is the handoff waypoint before advancing.
-                // If so, stop and switch to TAG_SEARCH instead of continuing.
                 RoboClawStopAll();
                 ResetPidState();
+
+                // ── Mechanism actions on waypoint completion ──────────────────
+                // Fires once when the robot finishes the listed waypoint index.
+                if (m_currentSetpointIndex == 5) {
+                    // Completed reverse-33cm approach — raise arm to beacon position
+                    // before the robot executes the hold at [6] and turns at [7].
+                    DepositBeacon();
+                }
+
+                // ── Path / TAG_SEARCH handoff ─────────────────────────────────
                 if (m_currentSetpointIndex == kTagHandoffWaypoint) {
-                    RoboClawStopAll();
                     m_timer.Reset();
                     m_timer.Start();
                     m_autoPhase = AutoPhase::TAG_SEARCH;
                 } else {
                     AdvanceToNextSetpoint();
-                    RoboClawStopAll();
                 }
                 break;
             }
