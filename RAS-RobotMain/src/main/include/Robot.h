@@ -88,9 +88,9 @@ class Robot : public frc::TimesliceRobot {
   rev::servohub::ServoChannel& m_servoArm{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId5)}; //Arm
   //PID Tuning
   // Gains
-  double x_kP = 0.0;
-  double x_kI = 0.0;
-  double x_kD = 0.0;
+  double x_kP = 105.0;
+  double x_kI = 19.0;
+  double x_kD = 0.8;
   double y_kP = 210.0;
   double y_kI = 30.0;
   double y_kD = 0.1;
