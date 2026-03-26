@@ -733,8 +733,8 @@ void Robot::AutonomousPeriodic() {
             theta_prevError = theta_error;
 
             // Zero out axis when within tolerance (also prevents integral windup)
-            constexpr double kXTol     = 0.005;
-            constexpr double kYTol     = 0.005;
+            constexpr double kXTol     = 0.002;
+            constexpr double kYTol     = 0.002;
             constexpr double kThetaTol = 0.05; // ~3° — tight enough for accuracy, wide enough to settle
             if (std::abs(x_error) <= kXTol)
             {
