@@ -782,6 +782,43 @@ void Robot::AutonomousPeriodic() {
                 RoboClawStopAll();
                 ResetPidState();
 
+                // ── Ore deposit dwell (waypoints 16 and 29) ──────────────────
+                // Non-blocking: start extend on first arrival, poll each tick,
+                // retract when extend time elapses, advance when retract done.
+                bool isDepositWaypoint = (m_currentSetpointIndex == 16 ||
+                                          m_currentSetpointIndex == 29);
+                if (isDepositWaypoint) {
+                    double now = m_timer.Get().value();
+                    if (m_actuatorDwellStep == 0) {
+                        // First arrival — start extending
+                        ActuatorExtend(kActuatorSpeed);
+                        m_actuatorDwellStart_s = now;
+                        m_actuatorDwellStep = 1;
+                        std::cout << "[Deposit] Extending actuator\n";
+                        break;  // come back next tick
+                    } else if (m_actuatorDwellStep == 1) {
+                        // Waiting for full extension
+                        if (now - m_actuatorDwellStart_s < kActuatorRunTime_s) {
+                            break;  // still extending
+                        }
+                        ActuatorStop();
+                        ActuatorRetract(kActuatorSpeed);
+                        m_actuatorDwellStart_s = now;
+                        m_actuatorDwellStep = 2;
+                        std::cout << "[Deposit] Retracting actuator\n";
+                        break;
+                    } else if (m_actuatorDwellStep == 2) {
+                        // Waiting for full retraction
+                        if (now - m_actuatorDwellStart_s < kActuatorRunTime_s) {
+                            break;  // still retracting
+                        }
+                        ActuatorStop();
+                        m_actuatorDwellStep = 0;  // reset for next deposit
+                        std::cout << "[Deposit] Done\n";
+                        // fall through to advance
+                    }
+                }
+
                 // ── Path / TAG_SEARCH handoff ─────────────────────────────────
                 if (m_currentSetpointIndex == kTagHandoffWaypoint) {
                     m_timer.Reset();

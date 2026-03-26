@@ -271,6 +271,11 @@ class Robot : public frc::TimesliceRobot {
   static constexpr double  kActuatorRunTime_s = 5.0;  // TODO: tune – seconds to full extend/retract
   bool m_actuatorExtended = false;
 
+  // Actuator dwell state — used during ore deposit waypoints.
+  // 0 = idle, 1 = extending, 2 = retracting
+  int    m_actuatorDwellStep = 0;
+  double m_actuatorDwellStart_s = 0.0;
+
   // ── Bucket / beacon mechanisms ───────────────────────────────────────────
   // Only m_servoArm is used in the non-sorting system.
   void GrabBucket   ();  // Raise arm then clamp onto collection bucket
