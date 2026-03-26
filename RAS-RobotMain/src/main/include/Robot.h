@@ -170,8 +170,8 @@ class Robot : public frc::TimesliceRobot {
   static constexpr int kHallServoInitPos    = 500;   // Closed
   static constexpr int kHallServoOpenPos    = 1500;  // Open
   static constexpr int BrushServoInitPos    = 500;
-  static constexpr int BrushServoOpenPos    = 2500;
-  static constexpr int ArmServoInitPos      = 900;
+  static constexpr int BrushServoOpenPos    = 1500;
+  static constexpr int ArmServoInitPos      = 500;
   static constexpr int ArmServoOpenPos      = 2000;
   static constexpr int ReleaseServoInitPos  = 500;
   static constexpr int ReleaseServoOpenPos  = 1500;

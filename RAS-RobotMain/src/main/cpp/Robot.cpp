@@ -539,9 +539,13 @@ void Robot::AutonomousPeriodic() {
     // ── 1. Raise Arm  ──────────────────────────────────────────────────
     static units::second_t lastServoUpdate = 0_s;
 
-    if (frc::Timer::GetFPGATimestamp() - lastServoUpdate > 50_ms) {
+    if (frc::Timer::GetFPGATimestamp() - lastServoUpdate > 50_ms && m_currentSetpointIndex < 8) {
         m_servoArm.SetPulseWidth(ArmServoOpenPos);
         lastServoUpdate = frc::Timer::GetFPGATimestamp();
+    }
+    if (m_currentSetpointIndex == 8)
+    {
+        ArmLower();
     }
     // ── 2. Vision connection heartbeat ────────────────────────────────────
     // IsConnected() must be called every tick (it compares heartbeat counters).
@@ -772,13 +776,6 @@ void Robot::AutonomousPeriodic() {
             if (x_done && y_done && theta_done) {
                 RoboClawStopAll();
                 ResetPidState();
-
-                // ── Mechanism actions on waypoint completion ──────────────────
-                // Fires once when the robot finishes the listed waypoint index.
-                if (m_currentSetpointIndex == 8) {
-                    // Completed turn + hold — lower arm back down after beacon deposit.
-                    ArmLower();
-                }
 
                 // ── Path / TAG_SEARCH handoff ─────────────────────────────────
                 if (m_currentSetpointIndex == kTagHandoffWaypoint) {
