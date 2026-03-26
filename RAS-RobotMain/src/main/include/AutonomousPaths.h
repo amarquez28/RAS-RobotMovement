@@ -104,8 +104,13 @@ namespace AutonomousPaths {
 static std::vector<Setpoint> Path_Default() {
     using namespace PathConst;
     return {
+        //Path #2
+        {0.34, 0.0, 0.0},
+        {0.68, 0.0, 0.0},
+        {0.38, 0.0, 0.0},
+        {0.38, 0.0, pi_2}
         // ── Start ─────────────────────────────────────────────────────────────────
-        { 0.00,  0.00,   0.0 },   // [0]  start
+        /*{ 0.00,  0.00,   0.0 },   // [0]  start
         { 0.00, -0.15,   0.0 },   // [1]  right 15 cm  (mid: [0]→[1] dy=0.30≥0.05)
         { 0.00, -0.30,   0.0 },   // [2]  right 15 cm  (second half)
 
@@ -298,7 +303,7 @@ static std::vector<Setpoint> Path_Default() {
         { 5.28,  0.08,  -pi   },          // [114] left 43 cm  (no split: dx=0 < 0.10)
         // [114]→[115]: dx=0.30≥0.10, dy=0 < 0.05 → no split
         { 5.13,  0.08,  -pi   },          // [115] reverse 15 cm
-        { 4.98,  0.08,  -pi   },          // [116] reverse 15 cm
+        { 4.98,  0.08,  -pi   }, */         // [116] reverse 15 cm
     };
 }
 
