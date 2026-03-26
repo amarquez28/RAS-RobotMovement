@@ -25,12 +25,15 @@
 #include <AutonomousPaths.h>
 
 // ── Autonomous phase ─────────────────────────────────────────────────────────
+// CENTERING : Strafe until the AprilTag is centered in the camera frame.
+//             Resets encoders + IMU when done, then transitions to APPROACH.
 // SEARCH    : No tag visible yet – robot holds position and waits.
 // APPROACH  : Running a waypoint path via PID dead-reckoning.
 // TAG_SEARCH: Default path complete – robot holds position and reads AprilTag
 //             ID to select which sub-path to run next.
 // DONE      : All paths complete – motors stopped, Pi notified.
 enum class AutoPhase{
+    CENTERING,
     SEARCH,
     APPROACH,
     TAG_SEARCH,
@@ -164,7 +167,9 @@ class Robot : public frc::TimesliceRobot {
   // TAG_SEARCH. After arriving here the robot stops, reads the AprilTag ID,
   // and loads the corresponding sub-path. Matches the end of the bucket grab
   // sequence in Path_Default (waypoint [40] per CLAUDE.md waypoint table).
-  static constexpr size_t kTagHandoffWaypoint = 40;
+  // Waypoint index after ore deposit where robot stops and reads an AprilTag
+  // to select the cave sub-path. Update this when Path_Default changes.
+  static constexpr size_t kTagHandoffWaypoint = 10;
 
   // How long to search for a tag before giving up and going to DONE.
   static constexpr double kTagSearchTimeout_s = 5.0; 

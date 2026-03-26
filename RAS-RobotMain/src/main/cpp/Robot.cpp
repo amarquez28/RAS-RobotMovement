@@ -484,8 +484,8 @@ void Robot::AutonomousInit() {
     // Load the setpoint sequence for the PID approach phase
     LoadAutonomousSetpoints();
 
-    // Reset approach state machine
-    m_autoPhase = AutoPhase::APPROACH;
+    // Reset approach state machine — start by centering on the AprilTag
+    m_autoPhase = AutoPhase::CENTERING;
     m_taskDone  = false;
 
     // Reset test sequencer
@@ -666,6 +666,56 @@ void Robot::AutonomousPeriodic() {
         break;
     }
 
+    // ── CENTERING: strafe until AprilTag is centered in camera frame ─────
+    // Non-blocking: each tick checks the pixel error and issues a single
+    // DriveHorizontal command, then returns. No while loops.
+    // When centered (or timed out), resets encoders + IMU and starts path.
+    case AutoPhase::CENTERING: {
+        frc::SmartDashboard::PutString("Auto/Phase", "Centering");
+
+        // Timeout safety: if we can't center in time, start the path anyway
+        if (m_timer.Get().value() >= kTagSearchTimeout_s) {
+            StopAllDrive();
+            RoboClawResetAllEncoders();
+            m_thetaRad     = 0.0;
+            m_yaw_rad      = 0.0;
+            m_firstPidLoop = true;
+            ResetPidState();
+            m_autoPhase = AutoPhase::APPROACH;
+            std::cout << "[Auto] Centering timed out — starting path from current position\n";
+            break;
+        }
+
+        if (!hasTag) {
+            StopAllDrive();
+            frc::SmartDashboard::PutString("Auto/Phase", "Centering (no tag)");
+            break;
+        }
+
+        double pixelError = tag.x - kCameraCenter_px;
+        frc::SmartDashboard::PutNumber("Auto/CenterError_px", pixelError);
+
+        if (std::abs(pixelError) <= kCenterTolerance_px) {
+            // Centered — lock lateral position, reset all odometry, start path
+            StopAllDrive();
+            RoboClawResetAllEncoders();
+            m_thetaRad     = 0.0;
+            m_yaw_rad      = 0.0;
+            m_firstPidLoop = true;
+            ResetPidState();
+            m_autoPhase = AutoPhase::APPROACH;
+            std::cout << "[Auto] Centered (error=" << pixelError << "px) — starting path\n";
+        } else {
+            // Strafe toward tag center.
+            // If pixelError > 0 (tag is RIGHT of center) → strafe right (+speed).
+            // Flip sign here if the robot strafes the wrong way.
+            int8_t strafeSpeed = (pixelError > 0) ? static_cast<int8_t>(kCenterSpeed)
+                                                   : static_cast<int8_t>(-kCenterSpeed);
+            DriveHorizontal(strafeSpeed);
+        }
+        break;
+    }
+
     // ── SEARCH: wait for a visible tag ───────────────────────────────────
     case AutoPhase::SEARCH:
         StopAllDrive();
@@ -782,11 +832,29 @@ void Robot::AutonomousPeriodic() {
                 RoboClawStopAll();
                 ResetPidState();
 
-                // ── Ore deposit dwell (waypoints 16 and 29) ──────────────────
+                // ── Beacon deposit dwell (waypoint 1) ────────────────────────
+                // Arm is already lowered from AutonomousInit. Hold position for
+                // kServoDwell_s so the beacon settles, then raise arm and advance.
+                if (m_currentSetpointIndex == 1) {
+                    double now = m_timer.Get().value();
+                    if (m_servoCommandTime.value() < 0) {
+                        // First arrival — start dwell timer
+                        m_servoCommandTime = units::second_t(now);
+                        break;
+                    }
+                    if ((now - m_servoCommandTime.value()) < kServoDwell_s) {
+                        break;  // still dwelling
+                    }
+                    // Done — raise arm, clear timer, fall through to advance
+                    ArmRaise();
+                    m_servoCommandTime = -1_s;
+                    std::cout << "[Beacon] Deposit complete — arm raised\n";
+                }
+
+                // ── Ore deposit dwell (waypoint 9) ───────────────────────────
                 // Non-blocking: start extend on first arrival, poll each tick,
                 // retract when extend time elapses, advance when retract done.
-                bool isDepositWaypoint = (m_currentSetpointIndex == 16 ||
-                                          m_currentSetpointIndex == 29);
+                bool isDepositWaypoint = (m_currentSetpointIndex == 9);
                 if (isDepositWaypoint) {
                     double now = m_timer.Get().value();
                     if (m_actuatorDwellStep == 0) {
