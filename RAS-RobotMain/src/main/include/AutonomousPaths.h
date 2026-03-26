@@ -117,99 +117,161 @@ static std::vector<Setpoint> Path_Default() {
     return {
 
         // ── Start ─────────────────────────────────────────────────────────────
-        { 0.00,  0.00,  0.0    }  // [0] start
-        /*{ 0.00, -0.30,  0.0    },  // [1] right 30 cm
+        { 0.00,  0.00,  0.0    },  // [0] start
+        { 0.00, -0.15,  0.0    },  // [1] right half 30 cm
+        { 0.00, -0.30,  0.0    },  // [2] right second half
 
         // ── Approach ──────────────────────────────────────────────────────────
-        { 0.54, -0.30,  0.0    },  // [2] forward 54 cm
-        { 0.54, -0.30, -pi_2   },  // [3] turn right 90°
-        { 1.27, -0.30, -pi_2   },  // [4] forward 73 cm
-        { 0.94, -0.30, -pi_2   },  // [5] reverse 33 cm
-        { 0.94, -0.30, -pi_2   },  // [6] raise arm 4 s
-        { 0.94, -0.30, -pi     },  // [7] turn right 90°
-        { 0.94, -0.30, -pi     },  // [8] lower arm 4 s
+        { 0.27, -0.30,  0.0    },  // [3] forward half 54 cm
+        { 0.54, -0.30,  0.0    },  // [4] forward second half
+        { 0.54, -0.30, -pi_2   },  // [5] turn right 90°
+        { 0.905, -0.30, -pi_2  },  // [6] forward half 73 cm
+        { 1.27, -0.30, -pi_2   },  // [7] forward second half
+        { 1.105, -0.30, -pi_2  },  // [8] reverse half 33 cm
+        { 0.94, -0.30, -pi_2   },  // [9] reverse second half
+        { 0.94, -0.30, -pi_2   },  // [10] raise arm 4 s
+        { 0.94, -0.30, -pi     },  // [11] turn right 90°
+        { 0.94, -0.30, -pi     },  // [12] lower arm 4 s
 
         // ── Lower field sweep ─────────────────────────────────────────────────
-        { 0.94,  0.09, -pi     },  // [9] left 39 cm
-        { 1.11,  0.09, -pi     },  // [10] forward 17 cm
-        { 0.85,  0.09, -pi     },  // [11] reverse 26 cm
-        { 0.85, -0.08, -pi     },  // [12] right 17 cm
-        { 1.62, -0.08, -pi     },  // [13] forward 77 cm
-        { 1.62,  0.09, -pi     },  // [14] left 17 cm
-        { 1.95,  0.09, -pi     },  // [15] forward 33 cm
-        { 1.03,  0.09, -pi     },  // [16] reverse 92 cm
+        { 0.94, -0.105, -pi    },  // [13] left half 39 cm
+        { 0.94,  0.09, -pi     },  // [14] left second half
+        { 1.025, 0.09, -pi     },  // [15] forward half 17 cm
+        { 1.11, 0.09, -pi      },  // [16] forward second half
+        { 0.975, 0.09, -pi     },  // [17] reverse half 26 cm
+        { 0.85, 0.09, -pi      },  // [18] reverse second half
+        { 0.85, 0.005, -pi     },  // [19] right half 17 cm
+        { 0.85, -0.08, -pi     },  // [20] right second half
+        { 1.28, -0.08, -pi     },  // [21] forward half 77 cm
+        { 1.62, -0.08, -pi     },  // [22] forward second half
+        { 1.785, 0.01, -pi     },  // [23] left half 17 cm
+        { 1.95, 0.09, -pi      },  // [24] left second half
+        { 1.49, 0.09, -pi      },  // [25] forward half 33 cm
+        { 1.95, 0.09, -pi      },  // [26] forward second half
+        { 1.49, 0.09, -pi      },  // [27] reverse half 92 cm
+        { 1.03, 0.09, -pi      },  // [28] reverse second half
 
         // ── Upper field sweep ─────────────────────────────────────────────────
-        { 1.03, -0.15, -pi     },  // [17] right 24 cm
-        { 1.96, -0.15, -pi     },  // [18] forward 93 cm
-        { 0.86, -0.15, -pi     },  // [19] reverse 110 cm
-        { 0.86, -0.39, -pi     },  // [20] right 24 cm
-        { 1.93, -0.39, -pi     },  // [21] forward 107 cm
-        { 0.86, -0.39, -pi     },  // [22] reverse 107 cm
-        { 0.86, -0.63, -pi     },  // [23] right 24 cm
-        { 1.76, -0.63, -pi     },  // [24] forward 90 cm
-        { 0.86, -0.63, -pi     },  // [25] reverse 90 cm
-        { 0.86, -0.72, -pi     },  // [26] right 9 cm
-        { 1.76, -0.72, -pi     },  // [27] forward 90 cm
-        { 1.01, -0.72, -pi     },  // [28] reverse 75 cm
+        { 1.03, -0.075, -pi    },  // [29] right half 24 cm
+        { 1.03, -0.15, -pi     },  // [30] right second half
+        { 1.495, -0.15, -pi    },  // [31] forward half 93 cm
+        { 1.96, -0.15, -pi     },  // [32] forward second half
+        { 1.41, -0.15, -pi     },  // [33] reverse half 110 cm
+        { 0.86, -0.15, -pi     },  // [34] reverse second half
+        { 0.86, -0.27, -pi     },  // [35] right half 24 cm
+        { 0.86, -0.39, -pi     },  // [36] right second half
+        { 1.395, -0.39, -pi    },  // [37] forward half 107 cm
+        { 1.93, -0.39, -pi     },  // [38] forward second half
+        { 1.395, -0.39, -pi    },  // [39] reverse half 107 cm
+        { 0.86, -0.39, -pi     },  // [40] reverse second half
+        { 0.86, -0.51, -pi     },  // [41] right half 24 cm
+        { 0.86, -0.63, -pi     },  // [42] right second half
+        { 1.31, -0.63, -pi     },  // [43] forward half 90 cm
+        { 1.76, -0.63, -pi     },  // [44] forward second half
+        { 1.31, -0.63, -pi     },  // [45] reverse half 90 cm
+        { 0.86, -0.63, -pi     },  // [46] reverse second half
+        { 0.86, -0.675, -pi    },  // [47] right half 9 cm
+        { 0.86, -0.72, -pi     },  // [48] right second half
+        { 1.32, -0.72, -pi     },  // [49] forward half 90 cm
+        { 1.76, -0.72, -pi     },  // [50] forward second half
+        { 0.935, -0.72, -pi    },  // [51] reverse half 75 cm
+        { 1.01, -0.72, -pi     },  // [52] reverse second half
 
         // ── Deposit + transit to cave ─────────────────────────────────────────
-        { 1.01,  0.09, -pi     },  // [29] left 81 cm
-        { 1.01, -0.31, -pi     },  // [30] right 40 cm
-        { 2.89, -0.31, -pi     },  // [31] forward 188 cm
+        { 1.01, -0.315, -pi    },  // [53] left half 81 cm
+        { 1.01,  0.09, -pi     },  // [54] left second half
+        { 1.01, -0.13, -pi     },  // [55] right half 40 cm
+        { 1.01, -0.31, -pi     },  // [56] right second half
+        { 2.59, -0.31, -pi     },  // [57] forward half 188 cm
+        { 2.89, -0.31, -pi     },  // [58] forward second half
 
         // ── Bucket grab sequence ──────────────────────────────────────────────
-        { 2.81, -0.31, -pi     },  // [32] reverse 8 cm
-        { 2.81, -0.31, -pi_2   },  // [33] turn left 90°
-        { 2.56, -0.31, -pi_2   },  // [34] reverse 25 cm
-        { 2.56, -0.48, -pi_2   },  // [35] right 17 cm
-        { 2.56, -0.48, -pi_2   },  // [36] grab bucket
-        { 2.71, -0.48, -pi_2   },  // [37] forward 15 cm
-        { 2.96, -0.48, -pi_2   },  // [38] forward 25 cm
-        { 3.21, -0.48, -pi_2   },  // [39] forward 25 cm
-        { 3.46, -0.48, -pi_2   },  // [40] forward 25 cm
+        { 2.85, -0.31, -pi     },  // [59] reverse half 8 cm
+        { 2.81, -0.31, -pi     },  // [60] reverse second half
+        { 2.81, -0.31, -pi_2   },  // [61] turn left 90°
+        { 2.685, -0.31, -pi_2  },  // [62] reverse half 25 cm
+        { 2.56, -0.31, -pi_2   },  // [63] reverse second half
+        { 2.56, -0.395, -pi_2  },  // [64] right half 17 cm
+        { 2.56, -0.48, -pi_2   },  // [65] right second half
+        { 2.56, -0.48, -pi_2   },  // [66] grab bucket
+        { 2.635, -0.48, -pi_2  },  // [67] forward half 15 cm
+        { 2.71, -0.48, -pi_2   },  // [68] forward second half
+        { 2.835, -0.48, -pi_2  },  // [69] forward half 25 cm
+        { 2.96, -0.48, -pi_2   },  // [70] forward second half
+        { 3.085, -0.48, -pi_2  },  // [71] forward half 25 cm
+        { 3.21, -0.48, -pi_2   },  // [72] forward second half
+        { 3.335, -0.48, -pi_2  },  // [73] forward half 25 cm
+        { 3.46, -0.48, -pi_2   },  // [74] forward second half
 
         // ── Cave april tag sweep row 1 ────────────────────────────────────────
-        { 2.48, -0.31, -pi           },  // [41] move to cave entry
-        { 2.48, -0.31, -3.0*pi/2.0   },  // [42] turn upward
-        { 2.48, -0.27, -3.0*pi/2.0   },  // [43] shift left 4 cm
-
-        { 2.88, -0.27, -3.0*pi/2.0   },  // [44] forward 40 cm
-        { 2.48, -0.27, -3.0*pi/2.0   },  // [45] reverse 40 cm
-        { 2.48, -0.52, -3.0*pi/2.0   },  // [46] right 25 cm
-        { 2.88, -0.52, -3.0*pi/2.0   },  // [47] forward 40 cm
-        { 2.48, -0.52, -3.0*pi/2.0   },  // [48] reverse 40 cm
-        { 2.48, -0.71, -3.0*pi/2.0   },  // [49] right 19 cm
-        { 2.88, -0.71, -3.0*pi/2.0   },  // [50] forward 40 cm
-        { 2.48, -0.71, -3.0*pi/2.0   },  // [51] reverse 40 cm
+        { 2.64, -0.395, -pi    },  // [75] move half to cave entry
+        { 2.48, -0.31, -pi     },  // [76] move second half
+        { 2.48, -0.31, -3.0*pi/2.0 },  // [77] turn upward
+        { 2.48, -0.29, -3.0*pi/2.0 },  // [78] shift left half 4 cm
+        { 2.48, -0.27, -3.0*pi/2.0 },  // [79] shift left second half
+        { 2.68, -0.27, -3.0*pi/2.0 },  // [80] forward half 40 cm
+        { 2.88, -0.27, -3.0*pi/2.0 },  // [81] forward second half
+        { 2.68, -0.27, -3.0*pi/2.0 },  // [82] reverse half 40 cm
+        { 2.48, -0.27, -3.0*pi/2.0 },  // [83] reverse second half
+        { 2.48, -0.395, -3.0*pi/2.0 }, // [84] right half 25 cm
+        { 2.48, -0.52, -3.0*pi/2.0 },  // [85] right second half
+        { 2.68, -0.52, -3.0*pi/2.0 },  // [86] forward half 40 cm
+        { 2.88, -0.52, -3.0*pi/2.0 },  // [87] forward second half
+        { 2.68, -0.52, -3.0*pi/2.0 },  // [88] reverse half 40 cm
+        { 2.48, -0.52, -3.0*pi/2.0 },  // [89] reverse second half
+        { 2.48, -0.645, -3.0*pi/2.0 }, // [90] right half 19 cm
+        { 2.48, -0.71, -3.0*pi/2.0 },  // [91] right second half
+        { 2.68, -0.71, -3.0*pi/2.0 },  // [92] forward half 40 cm
+        { 2.88, -0.71, -3.0*pi/2.0 },  // [93] forward second half
+        { 2.68, -0.71, -3.0*pi/2.0 },  // [94] reverse half 40 cm
+        { 2.48, -0.71, -3.0*pi/2.0 },  // [95] reverse second half
 
         // ── Cave april tag sweep row 2 ────────────────────────────────────────
-        { 2.48, -0.30, -3.0*pi/2.0   },  // [52] return center
-        { 2.48, -0.30, -pi_2         },  // [53] rotate downward
-        { 2.48, -0.34, -pi_2         },  // [54] shift right 4 cm
-
-        { 2.88, -0.34, -pi_2         },  // [55] forward 40 cm
-        { 2.48, -0.34, -pi_2         },  // [56] reverse 40 cm
-        { 2.48, -0.09, -pi_2         },  // [57] left 25 cm
-        { 2.88, -0.09, -pi_2         },  // [58] forward 40 cm
-        { 2.48, -0.09, -pi_2         },  // [59] reverse 40 cm
-        { 2.48,  0.10, -pi_2         },  // [60] left 19 cm
-        { 2.88,  0.10, -pi_2         },  // [61] forward 40 cm
-        { 2.48,  0.10, -pi_2         },  // [62] reverse 40 cm
+        { 2.48, -0.315, -3.0*pi/2.0 }, // [96] return half to center
+        { 2.48, -0.30, -3.0*pi/2.0  }, // [97] return second half
+        { 2.48, -0.32, -pi_2       }, // [98] rotate half downward
+        { 2.48, -0.30, -pi_2       }, // [99] rotate second half downward
+        { 2.48, -0.32, -pi_2       }, // [100] shift right half 4 cm
+        { 2.48, -0.34, -pi_2       }, // [101] shift right second half
+        { 2.68, -0.34, -pi_2       }, // [102] forward half 40 cm
+        { 2.88, -0.34, -pi_2       }, // [103] forward second half
+        { 2.68, -0.34, -pi_2       }, // [104] reverse half 40 cm
+        { 2.48, -0.34, -pi_2       }, // [105] reverse second half
+        { 2.48, -0.215, -pi_2      }, // [106] left half 25 cm
+        { 2.48, -0.09, -pi_2       }, // [107] left second half
+        { 2.68, -0.09, -pi_2       }, // [108] forward half 40 cm
+        { 2.88, -0.09, -pi_2       }, // [109] forward second half
+        { 2.68, -0.09, -pi_2       }, // [110] reverse half 40 cm
+        { 2.48, -0.09, -pi_2       }, // [111] reverse second half
+        { 2.48, 0.005, -pi_2       }, // [112] left half 19 cm
+        { 2.48, 0.10, -pi_2       },  // [113] left second half
+        { 2.68, 0.10, -pi_2       },  // [114] forward half 40 cm
+        { 2.88, 0.10, -pi_2       },  // [115] forward second half
+        { 2.68, 0.10, -pi_2       },  // [116] reverse half 40 cm
+        { 2.48, 0.10, -pi_2       },  // [117] reverse second half
 
         // ── Final transit ─────────────────────────────────────────────────────
-        { 2.48,  0.05, -pi_2         },  // [63] center align
-        { 2.48,  0.05, -pi           },  // [64] rotate forward
-        { 4.28,  0.05, -pi           },  // [65] forward 180 cm
-        { 4.28,  0.05,  0.0          },  // [66] turn around
-        { 5.28,  0.05,  0.0          },  // [67] forward 100 cm
-        { 5.28,  0.05, -pi_2         },  // [68] rotate right
-        { 5.03,  0.05, -pi_2         },  // [69] reverse 25 cm
-        { 5.28,  0.05, -pi_2         },  // [70] forward 25 cm
-        { 5.28, -0.35, -pi_2         },  // [71] right 40 cm
-        { 5.28, -0.35, -pi           },  // [72] rotate left
-        { 5.28,  0.08, -pi           },  // [73] left 43 cm
-        { 4.98,  0.08, -pi           }, */ // [74] reverse 30 cm
+        { 2.48, 0.075, -pi_2      }, // [118] center half
+        { 2.48, 0.05, -pi_2       }, // [119] center second half
+        { 2.48, 0.05, -pi         }, // [120] rotate forward
+        { 3.38, 0.05, -pi         }, // [121] forward half 180 cm
+        { 4.28, 0.05, -pi         }, // [122] forward second half
+        { 4.28, 0.05, 0.0         }, // [123] turn around
+        { 4.78, 0.05, 0.0         }, // [124] forward half 100 cm
+        { 5.28, 0.05, 0.0         }, // [125] forward second half
+        { 5.28, 0.05, -pi_2      }, // [126] rotate right
+        { 5.155, 0.05, -pi_2     }, // [127] reverse half 25 cm
+        { 5.03, 0.05, -pi_2      }, // [128] reverse second half
+        { 5.155, 0.05, -pi_2     }, // [129] forward half 25 cm
+        { 5.28, 0.05, -pi_2      }, // [130] forward second half
+        { 5.28, -0.175, -pi_2    }, // [131] right half 40 cm
+        { 5.28, -0.35, -pi_2     }, // [132] right second half
+        { 5.28, -0.135, -pi      }, // [133] rotate left half
+        { 5.28, -0.35, -pi       }, // [134] rotate left second half
+        { 5.13, -0.135, -pi      }, // [135] left half 43 cm
+        { 4.98, 0.08, -pi        }, // [136] left second half
+        { 5.13, 0.08, -pi        }, // [137] reverse half 30 cm
+        { 4.98, 0.08, -pi        }, // [138] reverse second half
     };
 }
 
