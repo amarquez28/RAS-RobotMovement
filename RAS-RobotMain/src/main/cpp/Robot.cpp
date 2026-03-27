@@ -422,6 +422,10 @@ void Robot::ResetPidState() {
     x_prevError     = 0.0;
     y_prevError     = 0.0;
     theta_prevError = 0.0;
+
+    x_deriv = 0.0;
+    y_deriv = 0.0;
+    theta_deriv = 0.0;
 }
 
 // ============================================================================
@@ -461,7 +465,6 @@ void Robot::AutonomousInit() {
 
     // Reset all encoders to zero so dead-reckoning is relative to start pos
     RoboClawResetAllEncoders();
-    RoboClawDrain();
 
     // Re-init IMU in case of a power cycle between runs
     IMUInit();
@@ -481,8 +484,8 @@ void Robot::AutonomousInit() {
     // Load the setpoint sequence for the PID approach phase
     LoadAutonomousSetpoints();
 
-    // Reset approach state machine
-    m_autoPhase = AutoPhase::SEARCH;
+    // Reset approach state machine — start by centering on the AprilTag
+    m_autoPhase = AutoPhase::CENTERING;
     m_taskDone  = false;
 
     // Reset test sequencer
@@ -499,15 +502,21 @@ void Robot::AutonomousInit() {
 
     // Snapshot encoders then zero them (UpdateEncoders fills the members;
     // we then overwrite with 0 so sweep distances are relative)
-    UpdateEncoders();
-    m_vertTicks  = 0;
-    m_horizTicks = 0;
+    //UpdateEncoders();
+    //m_vertTicks  = 0;
+    //m_horizTicks = 0;
 
     // Close hatch door
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
+    // Raise arm immediately so beacon clears the arena during early turns
+    m_armRaised = false;
+    m_armDropped = false;
+    ArmLower();
+
     // Safety stop
     RoboClawStopAll();
+    RoboClawDrain();
 
     std::cout << "[Auto] AutonomousInit complete\n";
 }
@@ -531,9 +540,18 @@ void Robot::AutonomousInit() {
 // ============================================================================
 
 void Robot::AutonomousPeriodic() {
-    // ── 1. Update sensors ──────────────────────────────────────────────────
-    UpdateEncoders();
+    // ── 1. Raise Arm  ──────────────────────────────────────────────────
+    // Raise arm once at start of autonomous
+    /*if (!m_armRaised) {
+        ArmRaise();
+        m_armRaised = true;
+    }
 
+    // Lower arm once when waypoint 8 is reached
+    if (m_currentSetpointIndex >= 8 && !m_armDropped) {
+        ArmLower();
+        m_armDropped = true;
+    }*/
     // ── 2. Vision connection heartbeat ────────────────────────────────────
     // IsConnected() must be called every tick (it compares heartbeat counters).
     bool visionConnected = m_aprilTagReader.IsConnected();
@@ -606,6 +624,186 @@ void Robot::AutonomousPeriodic() {
         frc::SmartDashboard::PutString("Auto/Phase", "Done");
         break;
 
+    // ── TAG_SEARCH: default path done, waiting for AprilTag ID ───────────
+    // Robot holds position. When a tag is seen, its ID selects the next path.
+    // If no tag is found within kTagSearchTimeout_s, go to DONE.
+    case AutoPhase::TAG_SEARCH: {
+        StopAllDrive();
+        double searchElapsed = m_timer.Get().value();
+        frc::SmartDashboard::PutString("Auto/Phase", "Tag Search");
+        frc::SmartDashboard::PutNumber("Auto/TagSearchTime_s", searchElapsed);
+
+        int tagId = 0;
+        bool tagFound = hasTag;
+        if (tagFound) {
+            tagId = m_aprilTagReader.GetPrimaryTag().id;
+            // Tag found — load the corresponding path, reset pose, start running
+            std::cout << "[Auto] Tag ID " << tagId << " detected — loading sub-path\n";
+            m_setpoints = AutonomousPaths::GetPath(tagId);
+            m_currentSetpointIndex = 0;
+            m_autoComplete = m_setpoints.empty();
+            ResetPidState();
+            RoboClawResetAllEncoders();
+            m_vertTicks  = 0;
+            m_horizTicks = 0;
+            m_autoPhase  = AutoPhase::APPROACH;
+            frc::SmartDashboard::PutNumber("Auto/TagId", tagId);
+        }
+        else{
+            //this is assuming the robot has the camera facing out the cave
+            //we will drive straight until we can see the april tag
+            //then when we see the april tag our new target will be the tag.distance - (comfortable distance away from tag to start bucket movement sequence)
+            double x_target     = -30.0;
+            double y_target     = -0.0;
+            double theta_target = 0.0;
+            double x_error     = x_target - x_pos;
+            double y_error     = y_target - y_pos;
+            double theta_error = WrapAngle(theta_target - m_thetaRad);
+            x_integral     += x_error     * dt;
+            y_integral     += y_error     * dt;
+            theta_integral += theta_error * dt;
+            double x_deriv     = (x_error     - x_prevError)     / dt;
+            double y_deriv     = (y_error     - y_prevError)     / dt;
+            double theta_deriv = (theta_error - theta_prevError) / dt;
+            double abs_theta = std::abs(theta_error);
+            double sched_kP  = 25.0;
+            if (abs_theta > std::numbers::pi / 4)
+                sched_kP = 80.0;
+            else if (abs_theta > std::numbers::pi / 12)
+                sched_kP = 40.0;
+
+            double x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv;
+            double y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv;
+            double theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv;
+            if (std::abs(x_cmd)     > 127.0) { x_integral     -= x_error     * dt; x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv; }
+            if (std::abs(y_cmd)     > 127.0) { y_integral     -= y_error     * dt; y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv; }
+            if (std::abs(theta_cmd) >  80.0) { theta_integral -= theta_error * dt; theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv; }
+            x_prevError     = x_error;
+            y_prevError     = y_error;
+            theta_prevError = theta_error;
+            constexpr double kXTol     = 0.002;
+            constexpr double kYTol     = 0.002;
+            constexpr double kThetaTol = 0.05; // ~3° — tight enough for accuracy, wide enough to settle
+            if (std::abs(x_error) <= kXTol)
+            {
+                x_cmd = 0.0;
+                x_integral = 0.0;
+                x_prevError = 0.0;
+                x_deriv = 0.0;
+            }
+            if (std::abs(y_error) <= kYTol)
+            {
+                y_cmd = 0.0;
+                y_integral = 0.0;
+                y_prevError = 0.0;
+                y_deriv = 0.0;
+            }
+            if (std::abs(theta_error) <= kThetaTol)
+            {
+                theta_cmd = 0.0;
+                theta_integral = 0.0;
+                theta_prevError = 0.0;
+                theta_deriv = 0.0;
+            }
+
+            bool x_done     = (std::abs(x_error)     <= kXTol);
+            bool y_done     = (std::abs(y_error)     <= kYTol);
+            bool theta_done = (std::abs(theta_error) <= kThetaTol);
+            x_cmd     = std::clamp(x_cmd,     -127.0, 127.0);
+            y_cmd     = std::clamp(y_cmd,     -127.0, 127.0);
+            theta_cmd = std::clamp(theta_cmd,  -80.0,  80.0);
+
+            // Minimum command (deadband kick) outside tolerance only
+            if (theta_cmd > 0.0 && theta_cmd < 15.0) theta_cmd = 15.0;
+            if (theta_cmd < 0.0 && theta_cmd > -15.0) theta_cmd = -15.0;
+            if (y_cmd > 0.0 && y_cmd < 25.0) y_cmd = 25.0;
+            if (y_cmd < 0.0 && y_cmd > -25.0) y_cmd = -25.0;
+
+            // Differential mixing for drive wheels
+            double xr_cmd = std::clamp(x_cmd + theta_cmd, -127.0, 127.0);
+            double xl_cmd = std::clamp(x_cmd - theta_cmd, -127.0, 127.0);
+            if (xr_cmd > 0.0 && xr_cmd < 25.0) xr_cmd = 25.0;
+            if (xr_cmd < 0.0 && xr_cmd > -25.0) xr_cmd = -25.0;
+            if (xl_cmd > 0.0 && xl_cmd < 25.0) xl_cmd = 25.0;
+            if (xl_cmd < 0.0 && xl_cmd > -25.0) xl_cmd = -25.0;
+
+            double spdr = std::abs(xr_cmd);
+            double spdl = std::abs(xl_cmd);
+            double spdy = std::abs(y_cmd);
+             // Right drive (M1 on 0x80)
+            if      (xr_cmd > 0.0) RoboClawM1Forward (kRoboClawAddr_Drive, static_cast<uint8_t>(spdr));
+            else if (xr_cmd < 0.0) RoboClawM1Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdr));
+            else                   RoboClawM1Forward  (kRoboClawAddr_Drive, 0);
+
+            // Left drive (M2 on 0x80)
+            if      (xl_cmd > 0.0) RoboClawM2Forward (kRoboClawAddr_Drive, static_cast<uint8_t>(spdl));
+            else if (xl_cmd < 0.0) RoboClawM2Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdl));
+            else                   RoboClawM2Forward  (kRoboClawAddr_Drive, 0);
+
+            // Strafe (M1 on 0x81)
+            if      (y_cmd > 0.0) RoboClawM1Forward (kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
+            else if (y_cmd < 0.0) RoboClawM1Backward(kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
+            else                  RoboClawM1Forward  (kRoboClawAddr_Strafe, 0);
+
+        }
+
+        break;
+    }
+
+    // ── CENTERING: strafe until AprilTag is centered in camera frame ─────
+    // Non-blocking: each tick checks the pixel error and issues a single
+    // DriveHorizontal command, then returns. No while loops.
+    // When centered (or timed out), resets encoders + IMU and starts path.
+    case AutoPhase::CENTERING: {
+        frc::SmartDashboard::PutString("Auto/Phase", "Centering");
+
+        // // Timeout safety: if we can't center in time, start the path anyway
+        // if (m_timer.Get().value() >= kTagSearchTimeout_s) {
+        //     StopAllDrive();
+        //     RoboClawResetAllEncoders();
+        //     m_thetaRad     = 0.0;
+        //     m_yaw_rad      = 0.0;
+        //     m_firstPidLoop = true;
+        //     ResetPidState();
+        //     m_autoPhase = AutoPhase::APPROACH;
+        //     std::cout << "[Auto] Centering timed out — starting path from current position\n";
+        //     break;
+        // }
+        //keep driving right until we see an april tag
+        if(!hasTag){
+            int8_t strafeSpeed = static_cast<int8_t>(kCenterSpeed);
+            DriveHorizontal(strafeSpeed);
+        }
+        else{
+            double pixelError = tag.x - kCameraCenter_px;
+            frc::SmartDashboard::PutNumber("Auto/CenterError_px", pixelError);
+
+            if (std::abs(pixelError) <= kCenterTolerance_px)
+            {
+                // Centered — lock lateral position, reset all odometry, start path
+                StopAllDrive();
+                RoboClawResetAllEncoders();
+                m_thetaRad = 0.0;
+                m_yaw_rad = 0.0;
+                m_firstPidLoop = true;
+                ResetPidState();
+                m_autoPhase = AutoPhase::APPROACH;
+                std::cout << "[Auto] Centered (error=" << pixelError << "px) — starting path\n";
+            }
+            else
+            {
+                // Strafe toward tag center.
+                // If pixelError > 0 (tag is RIGHT of center) → strafe right (+speed).
+                // Flip sign here if the robot strafes the wrong way.
+                int8_t strafeSpeed = (pixelError > 0) ? static_cast<int8_t>(kCenterSpeed)
+                                                      : static_cast<int8_t>(-kCenterSpeed);
+                DriveHorizontal(strafeSpeed);
+            }
+        }
+
+        break;
+    }
+
     // ── SEARCH: wait for a visible tag ───────────────────────────────────
     case AutoPhase::SEARCH:
         StopAllDrive();
@@ -631,16 +829,21 @@ void Robot::AutonomousPeriodic() {
         {
             // Use setpoints from the loaded list if they haven't all been
             // completed, otherwise fall back to a simple tag-distance target.
-            double x_target, y_target, theta_target;
-            if (!m_autoComplete && !m_setpoints.empty()) {
-                const auto& sp = m_setpoints[m_currentSetpointIndex];
-                x_target     = sp.x_trgt;
-                y_target     = sp.y_trgt;
-                theta_target = sp.theta_rad_trgt;
+            // All waypoints done → stop and hold
+            if (m_autoComplete || m_setpoints.empty()) {
+                StopAllDrive();
+                m_autoPhase = AutoPhase::DONE;
+                frc::SmartDashboard::PutString("Auto/Phase", "Done (path complete)");
+                break;
             }
+
+            const auto& sp = m_setpoints[m_currentSetpointIndex];
+            double x_target     = sp.x_trgt;
+            double y_target     = sp.y_trgt;
+            double theta_target = sp.theta_rad_trgt;
+
             //uncomment when we bring back april tag detection
             // } else {
-            //     // Simple fallback: drive forward by tag distance, hold current y/theta
             //     x_target     = x_pos + tag.distance;
             //     y_target     = y_pos;
             //     theta_target = m_thetaRad;
@@ -654,9 +857,6 @@ void Robot::AutonomousPeriodic() {
             x_integral     += x_error     * dt;
             y_integral     += y_error     * dt;
             theta_integral += theta_error * dt;
-            x_integral      = std::clamp(x_integral,     -10.0, 10.0);
-            y_integral      = std::clamp(y_integral,     -10.0, 10.0);
-            theta_integral  = std::clamp(theta_integral, -10.0, 10.0);
 
             // Differentiate
             double x_deriv     = (x_error     - x_prevError)     / dt;
@@ -665,13 +865,21 @@ void Robot::AutonomousPeriodic() {
 
             // Gain scheduling for theta: larger P when heading error is large
             double abs_theta = std::abs(theta_error);
-            double sched_kP  = 40.0;
-            if      (abs_theta > std::numbers::pi / 4)  sched_kP = 80.0;
-            else if (abs_theta > std::numbers::pi / 12) sched_kP = 60.0;
+            double sched_kP  = 25.0;
+            if (abs_theta > std::numbers::pi / 4)
+                sched_kP = 80.0;
+            else if (abs_theta > std::numbers::pi / 12)
+                sched_kP = 40.0;
 
             double x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv;
             double y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv;
             double theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv;
+
+            // Anti-windup: only freeze the integral when the output is saturated.
+            // If saturated, undo this tick's accumulation and recompute.
+            if (std::abs(x_cmd)     > 127.0) { x_integral     -= x_error     * dt; x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv; }
+            if (std::abs(y_cmd)     > 127.0) { y_integral     -= y_error     * dt; y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv; }
+            if (std::abs(theta_cmd) >  80.0) { theta_integral -= theta_error * dt; theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv; }
 
             // Save errors for next derivative calculation
             x_prevError     = x_error;
@@ -679,20 +887,102 @@ void Robot::AutonomousPeriodic() {
             theta_prevError = theta_error;
 
             // Zero out axis when within tolerance (also prevents integral windup)
-            constexpr double kXTol     = 0.005;
-            constexpr double kYTol     = 0.005;
-            constexpr double kThetaTol = 0.02;
-            if (std::abs(x_error)     <= kXTol)     { x_cmd     = 0.0; x_integral     = 0.0; }
-            if (std::abs(y_error)     <= kYTol)      { y_cmd     = 0.0; y_integral     = 0.0; }
-            if (std::abs(theta_error) <= kThetaTol) { theta_cmd = 0.0; theta_integral = 0.0; }
+            constexpr double kXTol     = 0.002;
+            constexpr double kYTol     = 0.002;
+            constexpr double kThetaTol = 0.05; // ~3° — tight enough for accuracy, wide enough to settle
+            if (std::abs(x_error) <= kXTol)
+            {
+                x_cmd = 0.0;
+                x_integral = 0.0;
+                x_prevError = 0.0;
+                x_deriv = 0.0;
+            }
+            if (std::abs(y_error) <= kYTol)
+            {
+                y_cmd = 0.0;
+                y_integral = 0.0;
+                y_prevError = 0.0;
+                y_deriv = 0.0;
+            }
+            if (std::abs(theta_error) <= kThetaTol)
+            {
+                theta_cmd = 0.0;
+                theta_integral = 0.0;
+                theta_prevError = 0.0;
+                theta_deriv = 0.0;
+            }
 
             bool x_done     = (std::abs(x_error)     <= kXTol);
             bool y_done     = (std::abs(y_error)     <= kYTol);
             bool theta_done = (std::abs(theta_error) <= kThetaTol);
 
             if (x_done && y_done && theta_done) {
-                AdvanceToNextSetpoint();
                 RoboClawStopAll();
+                ResetPidState();
+
+                // ── Beacon deposit dwell (waypoint 1) ────────────────────────
+                // Arm is already lowered from AutonomousInit. Hold position for
+                // kServoDwell_s so the beacon settles, then raise arm and advance.
+                if (m_currentSetpointIndex == 1) {
+                    double now = m_timer.Get().value();
+                    if (m_servoCommandTime.value() < 0) {
+                        // First arrival — start dwell timer
+                        m_servoCommandTime = units::second_t(now);
+                        break;
+                    }
+                    if ((now - m_servoCommandTime.value()) < kServoDwell_s) {
+                        break;  // still dwelling
+                    }
+                    // Done — raise arm, clear timer, fall through to advance
+                    ArmRaise();
+                    m_servoCommandTime = -1_s;
+                    std::cout << "[Beacon] Deposit complete — arm raised\n";
+                }
+
+                // ── Ore deposit dwell (waypoint 9) ───────────────────────────
+                // Non-blocking: start extend on first arrival, poll each tick,
+                // retract when extend time elapses, advance when retract done.
+                bool isDepositWaypoint = (m_currentSetpointIndex == 9);
+                if (isDepositWaypoint) {
+                    double now = m_timer.Get().value();
+                    if (m_actuatorDwellStep == 0) {
+                        // First arrival — start extending
+                        ActuatorExtend(kActuatorSpeed);
+                        m_actuatorDwellStart_s = now;
+                        m_actuatorDwellStep = 1;
+                        std::cout << "[Deposit] Extending actuator\n";
+                        break;  // come back next tick
+                    } else if (m_actuatorDwellStep == 1) {
+                        // Waiting for full extension
+                        if (now - m_actuatorDwellStart_s < kActuatorRunTime_s) {
+                            break;  // still extending
+                        }
+                        ActuatorStop();
+                        ActuatorRetract(kActuatorSpeed);
+                        m_actuatorDwellStart_s = now;
+                        m_actuatorDwellStep = 2;
+                        std::cout << "[Deposit] Retracting actuator\n";
+                        break;
+                    } else if (m_actuatorDwellStep == 2) {
+                        // Waiting for full retraction
+                        if (now - m_actuatorDwellStart_s < kActuatorRunTime_s) {
+                            break;  // still retracting
+                        }
+                        ActuatorStop();
+                        m_actuatorDwellStep = 0;  // reset for next deposit
+                        std::cout << "[Deposit] Done\n";
+                        // fall through to advance
+                    }
+                }
+
+                // ── Path / TAG_SEARCH handoff ─────────────────────────────────
+                if (m_currentSetpointIndex == kTagHandoffWaypoint) {
+                    m_timer.Reset();
+                    m_timer.Start();
+                    m_autoPhase = AutoPhase::TAG_SEARCH;
+                } else {
+                    AdvanceToNextSetpoint();
+                }
                 break;
             }
 
@@ -702,10 +992,10 @@ void Robot::AutonomousPeriodic() {
             theta_cmd = std::clamp(theta_cmd,  -80.0,  80.0);
 
             // Minimum command (deadband kick) outside tolerance only
-            if (theta_cmd > 0.0 && theta_cmd < 25.0) theta_cmd = 25.0;
-            if (theta_cmd < 0.0 && theta_cmd > -25.0) theta_cmd = -25.0;
-            if (y_cmd > 0.0 && y_cmd < 15.0) y_cmd = 15.0;
-            if (y_cmd < 0.0 && y_cmd > -15.0) y_cmd = -15.0;
+            if (theta_cmd > 0.0 && theta_cmd < 15.0) theta_cmd = 15.0;
+            if (theta_cmd < 0.0 && theta_cmd > -15.0) theta_cmd = -15.0;
+            if (y_cmd > 0.0 && y_cmd < 25.0) y_cmd = 25.0;
+            if (y_cmd < 0.0 && y_cmd > -25.0) y_cmd = -25.0;
 
             // Differential mixing for drive wheels
             double xr_cmd = std::clamp(x_cmd + theta_cmd, -127.0, 127.0);
@@ -800,11 +1090,19 @@ void Robot::GrabBucket() {
     m_servoArm.SetPulseWidth(pw);
 }
 
-// DepositBeacon – raise the arm to the beacon-drop angle so the beacon
-// detaches and falls into the goal zone.
+// ArmRaise – raise the arm to the beacon-drop angle.
+// Call at autonomous start so the beacon clears the arena during early turns,
+// and again just before the deposit waypoint.
 // TODO: tune kArmServoBeaconPos (currently 1000 μs) for the right release angle.
-void Robot::DepositBeacon() {
-    m_servoArm.SetPulseWidth(kArmServoBeaconPos);
+void Robot::ArmRaise() {
+    m_servoArm.SetPulseWidth(ArmServoOpenPos);
+    std::cout << "[Mechanism] ArmRaise — arm up (" << ArmServoOpenPos << " μs)\n";
+}
+
+// ArmLower – return the arm to the init/resting position after deposit.
+void Robot::ArmLower() {
+    m_servoArm.SetPulseWidth(ArmServoInitPos);
+    std::cout << "[Mechanism] ArmLower — arm down (" << ArmServoInitPos << " μs)\n";
 }
 
 // DepositOres – extend the linear actuator at full speed for kActuatorRunTime_s
@@ -842,13 +1140,46 @@ void Robot::DisabledPeriodic() {}
 
 
 void Robot::TestInit() {
-
+    m_testStep = 0;
+    m_timer.Reset();
+    m_timer.Start();
 }
 
 
 void Robot::TestPeriodic() {
-   
+    double t = m_timer.Get().value();
+
+    switch (m_testStep)
+    {
+    case 0:
+        ActuatorExtend(kActuatorSpeed);
+        m_testStep = 1;
+        break;
+    case 1:
+        if(t >= kActuatorRunTime_s){
+            ActuatorStop();
+            m_timer.Reset();
+            m_timer.Start();
+            m_testStep = 2;
+        }
+        break;
+    case 2:
+        ActuatorRetract(kActuatorSpeed);
+        m_testStep = 3;
+        break;
+    case 3:
+        if(t >= kActuatorRunTime_s){
+            ActuatorStop();
+            m_testStep = 4;
+        }
+        break;
+    default:
+        break;
+    }
 }
+
+
+//test
 
 void Robot::SimulationPeriodic() {}
 

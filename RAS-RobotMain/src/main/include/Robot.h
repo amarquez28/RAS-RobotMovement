@@ -25,12 +25,18 @@
 #include <AutonomousPaths.h>
 
 // ── Autonomous phase ─────────────────────────────────────────────────────────
-// SEARCH  : No tag visible yet – robot holds position and waits.
-// APPROACH: Tag detected – robot drives straight toward it until ≤ 0.5 m away.
-// DONE    : Within stopping distance – motors stopped, Pi notified.
+// CENTERING : Strafe until the AprilTag is centered in the camera frame.
+//             Resets encoders + IMU when done, then transitions to APPROACH.
+// SEARCH    : No tag visible yet – robot holds position and waits.
+// APPROACH  : Running a waypoint path via PID dead-reckoning.
+// TAG_SEARCH: Default path complete – robot holds position and reads AprilTag
+//             ID to select which sub-path to run next.
+// DONE      : All paths complete – motors stopped, Pi notified.
 enum class AutoPhase{
+    CENTERING,
     SEARCH,
     APPROACH,
+    TAG_SEARCH,
     DONE
 };
 
@@ -62,6 +68,8 @@ class Robot : public frc::TimesliceRobot {
   void DriveTankSteered(int8_t baseSpeed, double pixelError);
 
  private:
+   units::second_t m_autoStartTime{0_s};
+
   // ── SmartDashboard / auto chooser ───────────────────────────────────────
   frc::SendableChooser<std::string> m_chooser;
   std::string m_autoSelected;
@@ -120,24 +128,30 @@ class Robot : public frc::TimesliceRobot {
   rev::servohub::ServoChannel &m_servoHall{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};//hall sensor
   rev::servohub::ServoChannel &m_servoArm{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId5)};//arm
 
+  units::second_t m_servoCommandTime{-1_s};
+  static constexpr double kServoDwell_s = 1.0;
+
   // PID Tuning gains
-  double x_kP = 91.0;
-  double x_kI = 8.0;
-  double x_kD = 5.0;
-  double y_kP = 160.0;
-  double y_kI = 0.0;
-  double y_kD = 0.5;
+  double x_kP = 95.0;
+  double x_kI = 19.0;
+  double x_kD = 0.8;
+  double y_kP = 300.0;
+  double y_kI = 55.0;
+  double y_kD = 0.01;
   double theta_kI = 5.0;
-  double theta_kD = 0.5;
+  double theta_kD = 0.3;
   // Forward/Backward wheel PID state
   double x_integral = 0.0;
   double x_prevError = 0.0;
+  double x_deriv = 0.0;
   // Strafe wheel PID state
   double y_integral = 0.0;
   double y_prevError = 0.0;
+  double y_deriv = 0.0;
   // Theta PID state
   double theta_integral  = 0.0;
   double theta_prevError = 0.0;
+  double theta_deriv = 0.0;
   // Gyro bias (rad/s) – measured during CalibrateGyroZBias() in AutonomousInit
   double m_gyroZBiasRadps = 0.0;
 
@@ -147,7 +161,18 @@ class Robot : public frc::TimesliceRobot {
 
   std::vector<Setpoint> m_setpoints;
   size_t m_currentSetpointIndex = 0;
-  bool m_autoComplete = false; 
+  bool m_autoComplete = false;
+
+  // Index of the last waypoint in Path_Default before handing off to
+  // TAG_SEARCH. After arriving here the robot stops, reads the AprilTag ID,
+  // and loads the corresponding sub-path. Matches the end of the bucket grab
+  // sequence in Path_Default (waypoint [40] per CLAUDE.md waypoint table).
+  // Waypoint index after ore deposit where robot stops and reads an AprilTag
+  // to select the cave sub-path. Update this when Path_Default changes.
+  static constexpr size_t kTagHandoffWaypoint = 10;
+
+  // How long to search for a tag before giving up and going to DONE.
+  static constexpr double kTagSearchTimeout_s = 30.0; 
 
   // Servo pulse widths (microseconds)
   static constexpr int kHallServoInitPos    = 500;   // Closed
@@ -155,9 +180,11 @@ class Robot : public frc::TimesliceRobot {
   static constexpr int BrushServoInitPos    = 500;
   static constexpr int BrushServoOpenPos    = 1500;
   static constexpr int ArmServoInitPos      = 500;
-  static constexpr int ArmServoOpenPos      = 1200;
+  static constexpr int ArmServoOpenPos      = 1500;
   static constexpr int ReleaseServoInitPos  = 500;
   static constexpr int ReleaseServoOpenPos  = 1500;
+  bool m_armRaised = false;
+  bool m_armDropped = false;
 
   // ── IMU (MPU-6050 on I²C onboard port, addr 0x68) ──────────────────────
   frc::I2C m_imu{frc::I2C::Port::kOnboard, 0x68};
@@ -249,16 +276,17 @@ class Robot : public frc::TimesliceRobot {
   static constexpr double  kActuatorRunTime_s = 5.0;  // TODO: tune – seconds to full extend/retract
   bool m_actuatorExtended = false;
 
+  // Actuator dwell state — used during ore deposit waypoints.
+  // 0 = idle, 1 = extending, 2 = retracting
+  int    m_actuatorDwellStep = 0;
+  double m_actuatorDwellStart_s = 0.0;
+
   // ── Bucket / beacon mechanisms ───────────────────────────────────────────
   // Only m_servoArm is used in the non-sorting system.
   void GrabBucket   ();  // Raise arm then clamp onto collection bucket
-  void DepositBeacon();  // Raise arm to beacon-drop angle; beacon detaches
+  void ArmRaise     ();  // Raise arm to beacon-drop angle (clears arena during turns)
+  void ArmLower     ();  // Lower arm back to init position after beacon is deposited
   void DepositOres  ();  // Extend actuator at full speed to push all ores out
-
-  // TODO: measure and set these pulse widths on real hardware (μs, 500–2500)
-  static constexpr int kArmServoGrabPos   = 500;  // TODO: closed/clamped position
-  static constexpr int kArmServoDropPos   = 1200; // TODO: open/release position
-  static constexpr int kArmServoBeaconPos = 1000; // TODO: beacon-deposit angle (may equal drop)
 
   // ── Test routines ────────────────────────────────────────────────────────
   // Call from TestInit()/TestPeriodic() to verify hardware before a match.

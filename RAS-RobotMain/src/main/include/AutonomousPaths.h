@@ -1,250 +1,174 @@
 // ============================================================================
-//  AutonomousPaths.h  –  RAS 2026  |  IEEE Region 5 Robotics Competition
+// AutonomousPaths.h – RAS 2026 | IEEE Region 5 Robotics Competition
 // ============================================================================
 //
-//  PURPOSE
-//  -------
-//  Central repository for all static autonomous paths.
-//  Each path is a sequence of {x_m, y_m, theta_rad} waypoints consumed by
-//  the PID controller in Robot.cpp.
+// PURPOSE
+// -------
+// Central repository for all static autonomous paths.
+// Each path is a sequence of {x_m, y_m, theta_rad} waypoints consumed by
+// the PID controller in Robot.cpp.
 //
-//  COORDINATE SYSTEM (field-relative, reset to zero at autonomous init)
-//  --------------------------------------------------------------------
-//    x      : forward / backward axis.  Positive = intake-forward direction.
-//    y      : lateral axis.             Positive = strafe RIGHT, negative = LEFT.
-//    theta  : heading in radians.       0 = forward, π = reversed, positive CCW.
+// COORDINATE SYSTEM (field-relative, reset to zero at autonomous init)
+// --------------------------------------------------------------------
+// x : forward / backward axis. Positive = intake-forward direction.
+// y : lateral axis. Positive = strafe RIGHT, negative = LEFT.
+// theta : heading in radians. 0 = forward, π = reversed, positive CCW.
 //
-//  ENCODER → METRE CONVERSION (from SweepController.h / BOM)
-//    Vertical  (0x80 M1/M2) : 3323 ticks / m   (751.8 PPR, 36.9:1, 72 mm wheel)
-//    Horizontal (0x81 M1)   : 1700 ticks / m   (384.5 PPR, 13.7:1, 72 mm wheel)
+// ENCODER → METRE CONVERSION (from SweepController.h / BOM)
+// Vertical (0x80 M1/M2) : 3323 ticks / m (751.8 PPR, 36.9:1, 72 mm wheel)
+// Horizontal (0x81 M1)  : 1700 ticks / m (384.5 PPR, 13.7:1, 72 mm wheel)
 //
-//  HOW TO ADD A NEW PATH
-//  ---------------------
-//  1. Write a new static function below following the PATH TEMPLATE.
-//  2. Register it inside GetPath() with the corresponding AprilTag ID.
-//  3. Update the header comment in GetPath() to reflect the new entry.
-//
-//  HOW PATHS ARE SELECTED
-//  ----------------------
-//  The robot reads an AprilTag ID at the start of autonomous.
-//  AutonomousInit() calls:
-//
-//      m_setpoints = AutonomousPaths::GetPath(tagId);
-//
-//  If no tag is seen, pass tagId = 0 to get the default/fallback path.
-//
-//  PHASE 1 SCOPE (IMU + PID only, no live AprilTag feedback)
-//  -----------------------------------------------------------
-//  All paths below use dead-reckoning (encoder odometry + IMU heading).
-//  AprilTag integration will be layered on top in a later sprint.
+// HOW TO ADD A NEW PATH / HOW PATHS ARE SELECTED
+// -----------------------------------------------
+// See GetPath() at the bottom of this file.
 //
 // ============================================================================
-
-
-
 #pragma once
-
 #include <vector>
-#include <numbers>    // std::numbers::pi  (C++20)
+#include <numbers>  // std::numbers::pi  (C++20)
 
-// ── Waypoint structure ───────────────────────────────────────────────────────
-// Mirrors the Setpoint struct in Robot.h.  Both files must stay in sync.
-// If you change this definition, update Robot.h's Setpoint struct to match.
-//
+// ── Waypoint structure ────────────────────────────────────────────────────────
 struct Setpoint {
     double x_trgt;         // Target x position (metres, forward positive)
     double y_trgt;         // Target y position (metres, right positive)
-    double theta_rad_trgt; // Target heading    (radians, CCW positive, 0 = fwd)
+    double theta_rad_trgt; // Target heading (radians, CCW positive, 0 = fwd)
 };
 
-// ── Named constants used across all paths ────────────────────────────────────
+// ── Named constants ───────────────────────────────────────────────────────────
 namespace PathConst {
-    inline constexpr double pi    = std::numbers::pi;
-    inline constexpr double pi_2  = std::numbers::pi / 2.0;
-    inline constexpr double pi_4  = std::numbers::pi / 4.0;
+    inline constexpr double pi     = std::numbers::pi;
+    inline constexpr double pi_2   = std::numbers::pi / 2.0;
+    inline constexpr double pi_4   = std::numbers::pi / 4.0;
     inline constexpr double two_pi = 2.0 * std::numbers::pi;
 
-    // ── Field geometry ────────────────────────────────────────────────────────
     inline constexpr double FIELD_LENGTH_M = 2.4384;  // 8 ft
     inline constexpr double FIELD_WIDTH_M  = 1.2192;  // 4 ft
 }
 
-// ============================================================================
-//  AutonomousPaths namespace
-//  All functions are static; no instantiation needed.
-// ============================================================================
 namespace AutonomousPaths {
 
-// ── PATH TEMPLATE ─────────────────────────────────────────────────────────────
-//
-//  Copy this block to create a new path.
-//  Replace PATH_N and tagId=N in GetPath() below.
-//
-//  static std::vector<Setpoint> Path_N() {
-//      using namespace PathConst;
-//      return {
-//          // ── Phase 1: Description ─────────────────────────────────────────
-//          { x_m,  y_m,  heading_rad },  // [0] What the robot does here
-//          { x_m,  y_m,  heading_rad },  // [1] ...
-//      };
-//  }
-//
-// ─────────────────────────────────────────────────────────────────────────────
-
-
 // ============================================================================
-//  Path 0  –  DEFAULT
-//  We will use this path up until we need to scan the april tag to move the
-//  bins in the correct place
+//  Path Default  –  DEFAULT  |  FULL COMPETITION PATH  (RAS 2026)
+//
+//  PRE-CONDITION
+//  -------------
+//  AutonomousInit() starts in CENTERING phase. The robot strafes until the
+//  AprilTag is centered in the camera frame, then resets all encoders and IMU
+//  to (0, 0, 0) before loading this path. All waypoints are relative to that
+//  centered and reset origin.
+//
+//  SEQUENCE
+//  --------
+//   [0]        Start at centered + reset origin.
+//   [1]        Reverse to cave wall — beacon deposits (arm already lowered).
+//              Robot dwells kServoDwell_s, then ArmRaise() is called.
+//   [2]        Return to sweep start line.
+//   [3]–[9]    4-row decreasing-length sweep (spiral). Each row is ~10 cm
+//              shorter at each end than the previous.
+//              Strafe shifts are 30 cm between rows (minimal strafe use).
+//   [9]        End of sweep — ore deposit (actuator extend/retract).
+//   [10]       Transit to cave AprilTag zone → TAG_SEARCH handoff.
+//              Robot reads tag ID here to select cave entry path (Path_1+).
+//
+//  TUNING NOTES
+//  ------------
+//  - x positive = away from cave (into field). Negative = toward cave.
+//  - y negative = strafe right (toward field boundary on camera side).
+//  - All distances are estimates. Measure the actual field and adjust.
+//  - kTagHandoffWaypoint must equal 10 in Robot.h.
 // ============================================================================
 static std::vector<Setpoint> Path_Default() {
     using namespace PathConst;
     return {
-        // ── Phase 1: Advance to mid-field ────────────────────────────────────
-        { 0.60,  0.0,  0.0 },   // [0] Drive forward 60 cm (≈ half field)
 
-        // ── Phase 2: Hold position ────────────────────────────────────────────
-        // Add further waypoints here once basic motion is verified.
+        // ── Start (position locked by CENTERING phase) ────────────────────────
+        {  0.00,  0.00,  0.0 },  // [0] origin — encoder/IMU reset by CENTERING
+
+        // ── Beacon deposit ────────────────────────────────────────────────────
+        //    Arm is already lowered from AutonomousInit. Robot reverses to the
+        //    cave wall so the beacon rests on the ground. The waypoint completion
+        //    block dwells kServoDwell_s then calls ArmRaise() before advancing.
+        //    TODO: measure the distance to the cave wall and adjust -0.30.
+        { -0.30,  0.00,  0.0 },  // [1] reverse 30 cm to cave wall (beacon drop)
+
+        // ── Return to sweep start ─────────────────────────────────────────────
+        {  0.00,  0.00,  0.0 },  // [2] drive back to centered origin
+
+        // ── Spiral boustrophedon sweep ────────────────────────────────────────
+        //    4 rows with decreasing length (10 cm shorter at each far-end turn).
+        //    Only the 30 cm lateral shifts use the strafe motor — all long legs
+        //    use the forward/backward drive motors only.
+        //
+        //    TODO: Adjust x_far (1.80 m) to match your actual field length.
+        //    TODO: Adjust strip width (0.30 m) to match your robot brush width.
+        {  1.80,  0.00,  0.0 },  // [3] row 1 forward  — full length
+        {  1.80, -0.30,  0.0 },  // [4] shift right 30 cm
+        {  0.10, -0.30,  0.0 },  // [5] row 2 backward — 10 cm shorter at far end
+        {  0.10, -0.60,  0.0 },  // [6] shift right 30 cm
+        {  1.70, -0.60,  0.0 },  // [7] row 3 forward  — 10 cm shorter at near end too
+        {  1.70, -0.90,  0.0 },  // [8] shift right 30 cm
+
+        // ── Ore deposit ───────────────────────────────────────────────────────
+        //    Waypoint completion block triggers actuator extend → retract dwell.
+        //    Robot holds this position while ores are dumped.
+        //    TODO: Adjust x (0.20 m) so the actuator faces the collection goal.
+        {  0.20, -0.90,  0.0 },  // [9] row 4 backward — ore deposit here
+
+        // ── Transit to cave AprilTag zone → TAG_SEARCH handoff ───────────────
+        //    Robot drives to the cave entrance and reads the AprilTag to select
+        //    which cave sub-path to run (Path_1, Path_2, etc.).
+        //    kTagHandoffWaypoint = 10 in Robot.h must match this index.
+        //    TODO: Adjust x (2.20 m) and y (-0.45 m) to your cave entrance.
+        {  2.20, -0.45,  0.0 },  // [10] transit to cave entrance — TAG_SEARCH handoff
     };
 }
 
 
 // ============================================================================
-//  Path 1  –  TAG ID 1  |  FULL COMPETITION PATH  (RAS 2026 field sweep)
-//
-//  Sequence overview:
-//    1.  Drive forward 54 cm.
-//    2.  Strafe right 10 cm.
-//    3.  Turn right 90° (theta = -π/2).
-//    4.  Forward 73 cm, reverse 33 cm.
-//    5.  Raise arm 4 s, turn right 90° (theta = -π), lower arm 4 s.
-//    6.  Lower-field boustrophedon sweep.
-//    7.  Deposit in bucket (x = 1.03, y = -0.23).
-//    8.  Upper-field boustrophedon sweep (4 rows).
-//    9.  Sweep done; deposit in bucket (x = 1.01, y = -0.23).
-//   10.  Transit to cave april-tag zone.
-//   11.  Cave sweep: left-side probes, 180° spin, right-side probes.
-//   12.  Exit cave, forward 180 cm.
-//
-//  All coordinates in metres (original waypoints ÷ 100).
-//  Theta expressed as multiples of pi (C++20 std::numbers::pi via PathConst).
+//  Path 1  –  TAG ID 1  |  CAVE ENTRY / SWEEP
+//  Loaded after TAG_SEARCH reads tag ID 1 at the cave entrance.
+//  All coordinates are relative to the encoder reset that happens in TAG_SEARCH.
+//  Strategy notes:
+//    - Enter cave forward, sweep inside, exit in reverse.
+//    - Adjust all distances to your actual cave dimensions.
 // ============================================================================
 static std::vector<Setpoint> Path_1() {
     using namespace PathConst;
     return {
-        // ── Start ─────────────────────────────────────────────────────────────
-        { 0.00,  0.00,  0.0    },  // [0]  start
-
-        // ── Approach ──────────────────────────────────────────────────────────
-        { 0.54,  0.00,  0.0    },  // [1]  forward 54 cm
-        { 0.54,  0.10,  0.0    },  // [2]  strafe right 10 cm
-        { 0.54,  0.10, -pi_2   },  // [3]  turn right 90°
-        { 1.27,  0.10, -pi_2   },  // [4]  forward 73 cm
-        { 0.94,  0.10, -pi_2   },  // [5]  reverse 33 cm
-        { 0.94,  0.10, -pi_2   },  // [6]  raise arm 4 s  (no movement)
-        { 0.94,  0.10, -pi     },  // [7]  turn right 90°
-        { 0.94,  0.10, -pi     },  // [8]  lower arm 4 s  (no movement)
-
-        // ── Lower field sweep ─────────────────────────────────────────────────
-        { 0.94, -0.23, -pi     },  // [9]  left 33 cm
-        { 1.11, -0.23, -pi     },  // [10] forward 17 cm
-        { 0.85, -0.23, -pi     },  // [11] reverse 26 cm
-        { 0.85, -0.06, -pi     },  // [12] right 17 cm
-        { 1.62, -0.06, -pi     },  // [13] forward 77 cm
-        { 1.62, -0.23, -pi     },  // [14] left 17 cm
-        { 1.95, -0.23, -pi     },  // [15] forward 33 cm
-        { 1.03, -0.23, -pi     },  // [16] reverse 92 cm  ← deposit in bucket
-
-        // ── Upper field sweep ─────────────────────────────────────────────────
-        { 1.03,  0.01, -pi     },  // [17] right 24 cm
-        { 1.96,  0.01, -pi     },  // [18] forward 93 cm
-        { 0.86,  0.01, -pi     },  // [19] reverse 110 cm
-        { 0.86,  0.25, -pi     },  // [20] right 24 cm
-        { 1.93,  0.25, -pi     },  // [21] forward 107 cm
-        { 0.86,  0.25, -pi     },  // [22] reverse 107 cm
-        { 0.86,  0.49, -pi     },  // [23] right 24 cm
-        { 1.76,  0.49, -pi     },  // [24] forward 90 cm
-        { 0.86,  0.49, -pi     },  // [25] reverse 90 cm
-        { 0.86,  0.58, -pi     },  // [26] right 9 cm
-        { 1.76,  0.58, -pi     },  // [27] forward 90 cm
-        { 1.01,  0.58, -pi     },  // [28] reverse 75 cm  ← sweep done
-
-        // ── Deposit + transit to cave ─────────────────────────────────────────
-        { 1.01, -0.23, -pi     },  // [29] left 82 cm     ← deposit in bucket
-        { 1.01,  0.17, -pi     },  // [30] right 41 cm
-        { 2.89,  0.17, -pi     },  // [31] forward 188 cm
-
-        // ── Cave april tag ────────────────────────────────────────────────────
-        { 2.48,  0.17, -pi           },  // [32] reverse 41 cm
-        { 2.48,  0.17, -3.0*pi/2.0   },  // [33] turn left 90°
-        { 2.48,  0.13, -3.0*pi/2.0   },  // [34] left 4 cm         (y motor)
-
-        { 2.88,  0.13, -3.0*pi/2.0   },  // [35] forward 40 cm     (x motor) probe
-        { 2.48,  0.13, -3.0*pi/2.0   },  // [36] reverse 40 cm
-        { 2.48,  0.38, -3.0*pi/2.0   },  // [37] right 25 cm       (y motor)
-        { 2.88,  0.38, -3.0*pi/2.0   },  // [38] forward 40 cm     probe
-        { 2.48,  0.38, -3.0*pi/2.0   },  // [39] reverse 40 cm
-        { 2.48,  0.57, -3.0*pi/2.0   },  // [40] right 19 cm       (y motor)
-        { 2.88,  0.57, -3.0*pi/2.0   },  // [41] forward 40 cm     probe
-        { 2.48,  0.57, -3.0*pi/2.0   },  // [42] reverse 40 cm
-
-        { 2.48,  0.16, -3.0*pi/2.0   },  // [43] left 41 cm        (y motor) return to center
-        { 2.48,  0.16, -pi_2          },  // [44] 180° in place
-        { 2.48,  0.20, -pi_2          },  // [45] right 4 cm        (y motor)
-
-        { 2.88,  0.20, -pi_2          },  // [46] forward 40 cm     probe
-        { 2.48,  0.20, -pi_2          },  // [47] reverse 40 cm
-        { 2.48, -0.05, -pi_2          },  // [48] left 25 cm        (y motor)
-        { 2.88, -0.05, -pi_2          },  // [49] forward 40 cm     probe
-        { 2.48, -0.05, -pi_2          },  // [50] reverse 40 cm
-        { 2.48, -0.24, -pi_2          },  // [51] left 19 cm        (y motor)
-        { 2.88, -0.24, -pi_2          },  // [52] forward 40 cm     probe
-        { 2.48, -0.24, -pi_2          },  // [53] reverse 40 cm
-
-        { 2.48, -0.19, -pi_2          },  // [54] right 5 cm        (y motor)
-        { 2.48, -0.19, -pi            },  // [55] turn right 90°
-        { 4.28, -0.19, -pi            },  // [56] forward 180 cm    ← exit cave
+        { 0.0, 0.0, 0.0 },  // [0] Placeholder — robot holds cave entrance position
     };
 }
 
 
 // ============================================================================
 //  Path 2  –  TAG ID 2  |  PLACEHOLDER
-//  Replace this stub with your actual Path 2 waypoints.
-//  Strategy notes:
-//    - ...
 // ============================================================================
 static std::vector<Setpoint> Path_2() {
     using namespace PathConst;
     return {
-        // ── TODO: Define Path 2 waypoints ────────────────────────────────────
-        { 0.0,  0.0,  0.0 },   // [0] Placeholder — robot holds start position
+        { 0.0, 0.0, 0.0 },  // [0] Placeholder
     };
 }
 
 
 // ============================================================================
 //  Path 3  –  TAG ID 3  |  PLACEHOLDER
-//  Replace this stub with your actual Path 3 waypoints.
 // ============================================================================
 static std::vector<Setpoint> Path_3() {
     using namespace PathConst;
     return {
-        // ── TODO: Define Path 3 waypoints ────────────────────────────────────
-        { 0.0,  0.0,  0.0 },   // [0] Placeholder — robot holds start position
+        { 0.0, 0.0, 0.0 },  // [0] Placeholder
     };
 }
 
 
 // ============================================================================
 //  Path 4  –  TAG ID 4  |  PLACEHOLDER
-//  Replace this stub with your actual Path 4 waypoints.
 // ============================================================================
 static std::vector<Setpoint> Path_4() {
     using namespace PathConst;
     return {
-        // ── TODO: Define Path 4 waypoints ────────────────────────────────────
-        { 0.0,  0.0,  0.0 },   // [0] Placeholder — robot holds start position
+        { 0.0, 0.0, 0.0 },  // [0] Placeholder
     };
 }
 
@@ -252,33 +176,15 @@ static std::vector<Setpoint> Path_4() {
 // ============================================================================
 //  GetPath  –  AprilTag ID dispatcher
 // ============================================================================
-//
-//  Called by Robot.cpp's LoadAutonomousSetpoints():
-//
-//      m_setpoints = AutonomousPaths::GetPath(tagId);
-//
-//  Tag ID → Path mapping:
-//    0      : Default / no tag detected → Path_Default()
-//    1      : Full competition path     → Path_1()
-//    2      : Path 2 (TBD)             → Path_2()
-//    3      : Path 3 (TBD)             → Path_3()
-//    4      : Path 4 (TBD)             → Path_4()
-//    other  : Falls back to Path_Default()
-//
 inline std::vector<Setpoint> GetPath(int tagId) {
     switch (tagId) {
         case 1:  return Path_1();
         case 2:  return Path_2();
         case 3:  return Path_3();
         case 4:  return Path_4();
-
-        // ── Add new cases above this line ─────────────────────────────────
-        // case 5: return Path_5();
-
         case 0:
-        default:
-            return Path_Default();
+        default: return Path_Default();
     }
 }
 
-} // namespace AutonomousPaths
+}  // namespace AutonomousPaths
