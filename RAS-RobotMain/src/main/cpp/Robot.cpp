@@ -934,7 +934,8 @@ void Robot::AutonomousPeriodic() {
         frc::SmartDashboard::PutString("Auto/Phase", "Centering");
 
         if (!hasTag) {
-            // Strafe +y until we see an AprilTag
+            // Strafe +y until we see an AprilTag — stop drive motors so we don't spin
+            DriveVertical(0);
             DriveHorizontal(static_cast<int8_t>(kCenterSpeed));
         } else {
             double pixelError = tag.x - kCameraCenter_px;
@@ -974,9 +975,14 @@ void Robot::AutonomousPeriodic() {
                 m_waypointStartTime_s = m_timer.Get().value();
                 m_autoPhase = AutoPhase::APPROACH;
             } else {
-                // Strafe toward tag center
-                int8_t strafeSpeed = (pixelError > 0) ? static_cast<int8_t>(kCenterSpeed)
-                                                      : static_cast<int8_t>(-kCenterSpeed);
+                // Proportional strafe: full speed when far off, slow down near center
+                // to avoid overshooting the deadband
+                double proportion = std::abs(pixelError) / 300.0;  // ramp over 300px
+                proportion = std::clamp(proportion, 0.0, 1.0);
+                int8_t minSpeed = 25;  // minimum to overcome friction
+                int8_t speed = static_cast<int8_t>(minSpeed + proportion * (kCenterSpeed - minSpeed));
+                int8_t strafeSpeed = (pixelError > 0) ? speed : -speed;
+                DriveVertical(0);  // stop drive motors so we don't spin
                 DriveHorizontal(strafeSpeed);
             }
         }
