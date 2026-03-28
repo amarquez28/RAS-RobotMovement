@@ -934,8 +934,14 @@ void Robot::AutonomousPeriodic() {
         frc::SmartDashboard::PutString("Auto/Phase", "Centering");
 
         if (!hasTag) {
-            // Strafe +y until we see an AprilTag — stop drive motors so we don't spin
-            DriveVertical(0);
+            // Strafe +y until we see an AprilTag
+            // Pulse drive motors briefly forward/backward to break static friction
+            // so the single strafe wheel can actually move the robot laterally
+            {
+                int pulse = static_cast<int>(m_timer.Get().value() * 10) % 2; // toggle ~5Hz
+                int8_t jog = pulse ? static_cast<int8_t>(20) : static_cast<int8_t>(-20);
+                DriveVertical(jog);
+            }
             DriveHorizontal(static_cast<int8_t>(kCenterSpeed));
         } else {
             double pixelError = tag.x - kCameraCenter_px;
