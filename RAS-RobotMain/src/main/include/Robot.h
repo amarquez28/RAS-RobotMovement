@@ -154,7 +154,7 @@ class Robot : public frc::TimesliceRobot {
                                   units::meter_t rightDist,
                                   frc::Rotation2d gyroAngle);
 
-  void Robot::AddVisionToPoseEstimator(const frc::Pose2d& visionPose,
+  void AddVisionToPoseEstimator(const frc::Pose2d& visionPose,
                                      units::second_t timestamp,
                                      const wpi::array<double, 3>& stdDevs) {
     field_poseEstimator.AddVisionMeasurement(visionPose, timestamp, stdDevs);
