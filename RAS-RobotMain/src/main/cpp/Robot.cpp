@@ -507,7 +507,7 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine — start by centering on the AprilTag
-    m_autoPhase = AutoPhase::CENTERING;
+    m_autoPhase = AutoPhase::APPROACH;
     m_taskDone  = false;
 
     // Reset test sequencer
@@ -538,7 +538,6 @@ void Robot::AutonomousInit() {
     m_armRaised = false;
     m_armDropped = false;
     ArmLower();
-    bool firstloop = true;
     // Safety stop
     RoboClawStopAll();
     RoboClawDrain();
@@ -591,6 +590,7 @@ void Robot::AutonomousPeriodic() {
     if (m_firstPidLoop) {
         m_prevTime    = now;
         m_firstPidLoop = false;
+        m_servoArm.SetPulseWidth(1400);
         return; // skip first cycle so dt is valid on the next call
     }
     dt = (now - m_prevTime).value();
@@ -1046,11 +1046,6 @@ void Robot::AutonomousPeriodic() {
             //Setpoint 27 Down
             //setpoint 45 Drop
             //Setpoint 53 Drop
-           
-            if (firstloop = true)
-            {
-                m_servoArm.SetPulseWidth(1400);
-            }
             
             if (m_currentSetpointIndex == 2 || m_currentSetpointIndex == 22 || m_currentSetpointIndex == 25 ||
             m_currentSetpointIndex == 42 || m_currentSetpointIndex == 52) {
