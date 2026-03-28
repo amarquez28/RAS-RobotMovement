@@ -935,12 +935,15 @@ void Robot::AutonomousPeriodic() {
 
         if (!hasTag) {
             // Strafe +y until we see an AprilTag
-            // Pulse drive motors briefly forward/backward to break static friction
-            // so the single strafe wheel can actually move the robot laterally
-            {
-                int pulse = static_cast<int>(m_timer.Get().value() * 10) % 2; // toggle ~5Hz
-                int8_t jog = pulse ? static_cast<int8_t>(45) : static_cast<int8_t>(-45);
+            // Pulse drive motors briefly to break static friction, then stop pulsing
+            static constexpr double kShakeDuration_s = 1.0;  // shake for 1 second
+            double elapsed = m_timer.Get().value();
+            if (elapsed <= kShakeDuration_s) {
+                int pulse = static_cast<int>(elapsed * 10) % 2; // toggle ~5Hz
+                int8_t jog = pulse ? static_cast<int8_t>(35) : static_cast<int8_t>(-35);
                 DriveVertical(jog);
+            } else {
+                DriveVertical(0);
             }
             DriveHorizontal(static_cast<int8_t>(kCenterSpeed));
         } else {
