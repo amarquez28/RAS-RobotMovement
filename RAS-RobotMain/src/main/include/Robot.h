@@ -88,7 +88,7 @@ class Robot : public frc::TimesliceRobot {
   frc::SerialPort m_roboclaw{38400, frc::SerialPort::Port::kMXP};
 
   // RoboClaw addresses
-  // 0x80 → RC1: M1 = Left drive motor,  M2 = Right drive motor  (vertical)
+  // 0x80 → RC1: M1 = Right drive motor, M2 = Left drive motor (vertical)  
   // 0x81 → RC2: M1 = Strafe motor                               (horizontal)
   static constexpr uint8_t kRoboClawAddr_Drive  = 0x80;
   static constexpr uint8_t kRoboClawAddr_Strafe = 0x81;

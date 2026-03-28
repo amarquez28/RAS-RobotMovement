@@ -609,8 +609,8 @@ void Robot::AutonomousPeriodic() {
     if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", static_cast<double>(e80_m2));
     if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", static_cast<double>(e81_m1));
 
-    units::meter_t xl_pos = units::meter_t{e80_m1 * kXMetPerPul};
-    units::meter_t xr_pos = units::meter_t{e80_m2 * kXMetPerPul};
+    units::meter_t xl_pos = units::meter_t{e80_m2 * kXMetPerPul};
+    units::meter_t xr_pos = units::meter_t{e80_m1 * kXMetPerPul};
     frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
     double rawStrafeY_m = e81_m1 * kYMetPerPul;
 
