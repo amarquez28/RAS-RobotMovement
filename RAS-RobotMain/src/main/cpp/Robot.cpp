@@ -1031,8 +1031,12 @@ void Robot::AutonomousPeriodic() {
                 StopAllDrive();
                 m_autoPhase = AutoPhase::DONE;
                 frc::SmartDashboard::PutString("Auto/Phase", "Done (path complete)");
+                std::cout << "[Auto] DONE — setpoints empty=" << m_setpoints.empty()
+                          << " autoComplete=" << m_autoComplete << "\n";
                 break;
             }
+            frc::SmartDashboard::PutNumber("Auto/Waypoint", m_currentSetpointIndex);
+            frc::SmartDashboard::PutNumber("Auto/SetpointCount", static_cast<double>(m_setpoints.size()));
             const auto& sp = m_setpoints[m_currentSetpointIndex];
 
             //RAISE ARM AND LOWER ARM CONDITIONS
@@ -1069,6 +1073,15 @@ void Robot::AutonomousPeriodic() {
 
             double x_error =  c * dx_field + s * dy_field;   // robot forward/back
             double y_error = -s * dx_field + c * dy_field;   // robot lateral
+
+            frc::SmartDashboard::PutNumber("PID/x_error", x_error);
+            frc::SmartDashboard::PutNumber("PID/y_error", y_error);
+            frc::SmartDashboard::PutNumber("PID/x_target", x_target);
+            frc::SmartDashboard::PutNumber("PID/y_target", y_target);
+            frc::SmartDashboard::PutNumber("PID/theta_target", theta_target);
+            frc::SmartDashboard::PutNumber("PID/x_pos", x_pos);
+            frc::SmartDashboard::PutNumber("PID/y_pos", y_pos);
+            frc::SmartDashboard::PutNumber("PID/theta_pos", theta_pos);
 
             // Outer loop: lateral error creates a heading reference correction
             double theta_ref = theta_target + y_to_theta_kP * y_error;
@@ -1237,6 +1250,11 @@ void Robot::AutonomousPeriodic() {
             if (xr_cmd < 0.0 && xr_cmd > -25.0) xr_cmd = -25.0;
             if (xl_cmd > 0.0 && xl_cmd < 25.0) xl_cmd = 25.0;
             if (xl_cmd < 0.0 && xl_cmd > -25.0) xl_cmd = -25.0;
+
+            frc::SmartDashboard::PutNumber("PID/x_cmd", x_cmd);
+            frc::SmartDashboard::PutNumber("PID/theta_cmd", theta_cmd);
+            frc::SmartDashboard::PutNumber("PID/xr_cmd", xr_cmd);
+            frc::SmartDashboard::PutNumber("PID/xl_cmd", xl_cmd);
 
             double spdr = std::abs(xr_cmd);
             double spdl = std::abs(xl_cmd);
