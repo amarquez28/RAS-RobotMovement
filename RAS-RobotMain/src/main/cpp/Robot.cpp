@@ -1059,8 +1059,7 @@ void Robot::AutonomousPeriodic() {
             //Setpoint 52 Open
 
             //SETPOINT 4 DROP
-            //SETPOINT 24 DROP
-            
+            //SETPOINT 24 DROP            
             //Setpoint 27 Down
             //setpoint 45 Drop
             //Setpoint 53 Drop
