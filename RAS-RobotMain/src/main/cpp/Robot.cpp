@@ -1049,18 +1049,33 @@ void Robot::AutonomousPeriodic() {
                 frc::SmartDashboard::PutString("Auto/Phase", "Done (path complete)");
                 break;
             }
-
             const auto& sp = m_setpoints[m_currentSetpointIndex];
+
+            //RAISE ARM AND LOWER ARM CONDITIONS
+            //SETPOINT 2 UP
+            //SETPOINT 22 Up
+            //SETPOINT 25 UP FOR RELEASING
+            //SETPOINT 42  Open
+            //Setpoint 52 Open
+
+            //SETPOINT 4 DROP
+            //SETPOINT 24 DROP
+            
+            //Setpoint 27 Down
+            //setpoint 45 Drop
+            //Setpoint 53 Drop
+            if (m_currentSetpointIndex == 2 || m_currentSetpointIndex == 22 || m_currentSetpointIndex == 25 ||
+            m_currentSetpointIndex == 42 || m_currentSetpointIndex == 52) {
+                ArmRaise();
+            }
+            if (m_currentSetpointIndex == 4 || m_currentSetpointIndex == 24 || m_currentSetpointIndex == 27 ||
+            m_currentSetpointIndex == 45 || m_currentSetpointIndex == 53) {
+                ArmLower();
+            }
+            
             double x_target     = sp.x_trgt;
             double y_target     = sp.y_trgt;
             double theta_target = sp.theta_rad_trgt;
-
-            //uncomment when we bring back april tag detection
-            // } else {
-            //     x_target     = x_pos + tag.distance;
-            //     y_target     = y_pos;
-            //     theta_target = m_thetaRad;
-            // }
 
             double dx_field = x_target - x_pos;
             double dy_field = y_target - y_pos;
