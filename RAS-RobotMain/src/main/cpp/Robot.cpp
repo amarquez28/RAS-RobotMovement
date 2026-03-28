@@ -489,12 +489,6 @@ void Robot::AutonomousInit() {
     frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
     ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
 
-    // Zero all yaw integrators – must happen before CalibrateGyroZBias
-    m_yaw_rad          = 0.0;
-    m_thetaRad         = 0.0;
-    m_lastGyroZ_radps  = 0.0;
-    m_lastIMUTime      = frc::Timer::GetFPGATimestamp();
-
     // m_thetaRad is already zeroed above; reset the PID first-loop flag
     m_firstPidLoop = true;
 
@@ -615,8 +609,8 @@ void Robot::AutonomousPeriodic() {
     if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", static_cast<double>(e80_m2));
     if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", static_cast<double>(e81_m1));
 
-    units::meter_t xl_pos = units::meter_t{e80_m2 * kXMetPerPul};
-    units::meter_t xr_pos = units::meter_t{e80_m1 * kXMetPerPul};
+    units::meter_t xl_pos = units::meter_t{e80_m1 * kXMetPerPul};
+    units::meter_t xr_pos = units::meter_t{e80_m2 * kXMetPerPul};
     frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
     double rawStrafeY_m = e81_m1 * kYMetPerPul;
 
@@ -878,9 +872,18 @@ void Robot::AutonomousPeriodic() {
             //     theta_target = m_thetaRad;
             // }
 
-            double x_error     = x_target - x_pos;
-            double y_error     = y_target - y_pos;
-            double theta_error = WrapAngle(theta_target - theta_pos);
+            double dx_field = x_target - x_pos;
+            double dy_field = y_target - y_pos;
+
+            double c = std::cos(theta_pos);
+            double s = std::sin(theta_pos);
+
+            double x_error =  c * dx_field + s * dy_field;   // robot forward/back
+            double y_error = -s * dx_field + c * dy_field;   // robot lateral
+
+            // Outer loop: lateral error creates a heading reference correction
+            double theta_ref = theta_target + y_to_theta_kP * y_error;
+            double theta_error = WrapAngle(theta_ref - theta_pos);
 
             // Integrate
             x_integral     += x_error     * dt;
@@ -909,6 +912,11 @@ void Robot::AutonomousPeriodic() {
             if (std::abs(x_cmd)     > 127.0) { x_integral     -= x_error     * dt; x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv; }
             if (std::abs(y_cmd)     > 127.0) { y_integral     -= y_error     * dt; y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv; }
             if (std::abs(theta_cmd) >  80.0) { theta_integral -= theta_error * dt; theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv; }
+
+            y_cmd = 0.0;   
+            y_integral = 0.0;
+            y_prevError = 0.0;
+            y_deriv = 0.0;
 
             // Save errors for next derivative calculation
             x_prevError     = x_error;
@@ -1055,10 +1063,7 @@ void Robot::AutonomousPeriodic() {
             else if (xl_cmd < 0.0) RoboClawM2Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdl));
             else                   RoboClawM2Forward  (kRoboClawAddr_Drive, 0);
 
-            // Strafe (M1 on 0x81)
-            if      (y_cmd > 0.0) RoboClawM1Forward (kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
-            else if (y_cmd < 0.0) RoboClawM1Backward(kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
-            else                  RoboClawM1Forward  (kRoboClawAddr_Strafe, 0);
+            RoboClawM1Forward(kRoboClawAddr_Strafe, 0);
 
             // PID telemetry
             frc::SmartDashboard::PutNumber("PID/WaypointIndex",

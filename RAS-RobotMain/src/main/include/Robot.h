@@ -177,6 +177,7 @@ class Robot : public frc::TimesliceRobot {
   double y_kP = 300.0;
   double y_kI = 55.0;
   double y_kD = 0.01;
+  double y_to_theta_kP = 1.2;
   double theta_kI = 5.0;
   double theta_kD = 0.3;
   // Forward/Backward wheel PID state
