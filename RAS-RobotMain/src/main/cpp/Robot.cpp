@@ -1064,11 +1064,11 @@ void Robot::AutonomousPeriodic() {
 
             // Gain scheduling for theta: larger P when heading error is large
             double abs_theta = std::abs(theta_error);
-            double sched_kP  = 20.0;
+            double sched_kP  = 30.0;
             if (abs_theta > std::numbers::pi / 4)
-                sched_kP = 60.0;
+                sched_kP = 90.0;
             else if (abs_theta > std::numbers::pi / 12)
-                sched_kP = 40.0;
+                sched_kP = 60.0;
 
             double x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv;
             double y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv;

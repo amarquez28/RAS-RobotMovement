@@ -83,28 +83,28 @@ static std::vector<Setpoint> Path_Default() {
 
        //First pick up
         {0.81, 0.16, -pi_2},   
-        {0.81, 0.22, 0},   // 0 Origin
+        {0.81, 0.16, -pi_2},  
+        {0.81, 0.22, 0},   //raise arm a little
         {0.81, 0.22, pi_2},
-        {0.81, 0.42, pi_2},
-        {0.81, 0.42, pi_2},    // 1 Reverse 40 cm		
-        {0.81, 0.62, pi_2},      // 2 Pickup arm
-        {0.81, 0.95, pi_2},      // 3 Reverse 21 cm //
-        {0.81, 0.62, pi_2},      // 4 Drop arm
+        {0.81, 0.42, pi_2},   	
+        {0.81, 0.62, pi_2},      
+        {0.81, 0.95, pi_2},      
+        {0.81, 0.62, pi_2},      
         {0.81, 0.62, 0},
 
 //Beacon
-	{0.55, 0.62, 0},     // 5 Turn left 90°  
-        {0.25, 0.62, 0}, 
+	    {0.55, 0.62, 0},    //Raise arm more
+        {0.25, 0.62, 0},    //Drop arm
 
 //first scout
-        {0.25, 0.62, pi_2},     // 5 Turn left 90°
-        {0.29, 0.96, pi_2},    // 6 Forward 30 cm along rotated x→y   
-        {0.29, 0.96, 0.0},      // 7 Turn right 90°
-        {0.42, 0.96, 0.0},     // 8 Forward 20 cm					
-        {0.42, 0.96, -pi_2},  //k  // 9 Turn right 90°
+        {0.25, 0.62, pi_2},     
+        {0.29, 0.96, pi_2},    
+        {0.29, 0.96, 0.0},     
+        {0.42, 0.96, 0.0},     				
+        {0.42, 0.96, -pi_2},  
         {0.42, 0.71, -pi_2},
         {0.42, 0.45, -pi_2},
-        {0.42, 0.22, -pi/2}, //k  // 10 Forward 70 cm
+        {0.42, 0.22, -pi/2}, 
 
 //Second bucket			
         {0.42, 0.22, 0.0},   //k  // 11 Turn left 90°
@@ -114,7 +114,7 @@ static std::vector<Setpoint> Path_Default() {
         {0.72, 0.82, -pi_2},
         {0.72, 0.52, -pi_2},   //k  // 14 Forward 51 cm
         {0.72, 0.33, -pi_2},    // 15 Reverse 51 cm
-        {0.72, 0.33, 0.0},     // 16 Turn right 90°
+        {0.72, 0.33, 0.0},      
         {0.31, 0.33, 0.0},     // 17 Forward 17 cm
 
 //First deposit
