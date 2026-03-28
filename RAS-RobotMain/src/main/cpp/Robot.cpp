@@ -390,10 +390,13 @@ void Robot::LoadAutonomousSetpoints() {
 
 void Robot::AdvanceToNextSetpoint() {
     ResetPidState();
+    m_waypointStartTime_s = m_timer.Get().value();  // restart per-waypoint clock
     if (m_currentSetpointIndex + 1 < m_setpoints.size()) {
         m_currentSetpointIndex++;
+        std::cout << "[Auto] Advanced to waypoint " << m_currentSetpointIndex << "\n";
     } else {
         m_autoComplete = true;
+        std::cout << "[Auto] All waypoints complete\n";
     }
 }
 
@@ -562,6 +565,7 @@ void Robot::AutonomousPeriodic() {
         ArmLower();
         m_armDropped = true;
     }*/
+
     // ── 2. Vision connection heartbeat ────────────────────────────────────
     // IsConnected() must be called every tick (it compares heartbeat counters).
     bool visionConnected = m_aprilTagReader.IsConnected();
@@ -752,6 +756,7 @@ void Robot::AutonomousPeriodic() {
             RoboClawResetAllEncoders();
             m_vertTicks  = 0;
             m_horizTicks = 0;
+            m_waypointStartTime_s = m_timer.Get().value();
             m_autoPhase  = AutoPhase::APPROACH;
             frc::SmartDashboard::PutNumber("Auto/TagId", tagId);
         }
@@ -895,6 +900,7 @@ void Robot::AutonomousPeriodic() {
                 ResetPidState();
                 frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
                 ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
+                m_waypointStartTime_s = m_timer.Get().value();
                 m_autoPhase = AutoPhase::APPROACH;
                 std::cout << "[Auto] Centered (error=" << pixelError << "px) — starting path\n";
             }
@@ -923,6 +929,7 @@ void Robot::AutonomousPeriodic() {
             // y_target = current y position (no lateral target yet).
             // theta_target = current heading (hold straight).
             // These will be updated live inside APPROACH every tick.
+            m_waypointStartTime_s = m_timer.Get().value();
             m_autoPhase = AutoPhase::APPROACH;
             [[fallthrough]]; // start driving this same tick
         } else {
@@ -935,6 +942,18 @@ void Robot::AutonomousPeriodic() {
         // Setpoint: drive x forward by tag.distance, hold y, hold heading.
         // The tag distance is the live "how far until we stop" signal.
         {
+            // Per-waypoint timeout: skip if stuck too long on one setpoint
+            {
+                double waypointElapsed = m_timer.Get().value() - m_waypointStartTime_s;
+                if (waypointElapsed >= kWaypointTimeout_s)
+                {
+                    StopAllDrive();
+                    std::cout << "[Auto] Waypoint " << m_currentSetpointIndex
+                              << " timed out (" << waypointElapsed << "s) — skipping\n";
+                    AdvanceToNextSetpoint();
+                    break;
+                }
+            }
             // Use setpoints from the loaded list if they haven't all been
             // completed, otherwise fall back to a simple tag-distance target.
             // All waypoints done → stop and hold
