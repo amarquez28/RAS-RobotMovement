@@ -133,6 +133,7 @@ class Robot : public frc::TimesliceRobot {
 
   //Pose initial point, first setpoint
   frc::Pose2d m_initialPose{0.78_m, 0.48_m, frc::Rotation2d{0_rad}}; //change values, wait for Justice
+  frc::Pose2d m_initialPose_BACKUP{0.81_m, 0.16_m, frc::Rotation2d{units::radian_t{-std::numbers::pi / 2.0}}};
 
   //Estimator declaration
   frc::DifferentialDrivePoseEstimator field_poseEstimator{
@@ -187,13 +188,14 @@ class Robot : public frc::TimesliceRobot {
   static constexpr double kBeaconApproachDist_m = 0.13;  // stop 13cm from tag
   static constexpr double kBeaconDwell_s = 1.5;          // time to drop beacon
 
+  bool firstloop;
   // PID Tuning gains
-  double x_kP = 130.0;
-  double x_kI = 18.0;
+  double x_kP = 140.0;
+  double x_kI = 25.0;
   double x_kD = 0.5;
-  double y_kP = 300.0;
-  double y_kI = 55.0;
-  double y_kD = 0.01;
+  double y_kP = 0.0;
+  double y_kI = 0.0;
+  double y_kD = 0.00;
   double y_to_theta_kP = 3.0;
   double theta_kI = 5.0;
   double theta_kD = 0.3;
@@ -226,9 +228,9 @@ class Robot : public frc::TimesliceRobot {
   // TAG_SEARCH. After arriving here the robot stops, reads the AprilTag ID,
   // and loads the corresponding sub-path. Matches the end of the bucket grab
   // sequence in Path_Default (waypoint [40] per CLAUDE.md waypoint table).
-  // Waypoint index after ore deposit where robot stops and reads an AprilTag
-  // to select the cave sub-path. Update this when Path_Default changes.
-  static constexpr size_t kTagHandoffWaypoint = 10;
+  // Waypoint index where robot stops and reads an AprilTag to select a sub-path.
+  // Set to 999 to disable (path runs to completion without handoff).
+  static constexpr size_t kTagHandoffWaypoint = 999;
 
   // How long (seconds) to spend on one waypoint before skipping to the next.
   static constexpr double kWaypointTimeout_s = 8.0;

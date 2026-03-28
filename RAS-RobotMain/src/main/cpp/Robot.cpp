@@ -381,7 +381,7 @@ double Robot::WrapAngle(double angle) {
 }
 
 void Robot::LoadAutonomousSetpoints() {
-    int tag_id = 1;
+    int tag_id = 0;  // Path_Default — Path_1 is commented out / empty
     // int tag_id = m_aprilTagReader.GetPrimaryTag().id;
     m_setpoints = AutonomousPaths::GetPath(tag_id);
     m_currentSetpointIndex = 0;
@@ -506,8 +506,8 @@ void Robot::AutonomousInit() {
     // Load the setpoint sequence for the PID approach phase
     LoadAutonomousSetpoints();
 
-    // Reset approach state machine — start by centering on the AprilTag
-    m_autoPhase = AutoPhase::CENTERING;
+    // Reset approach state machine — skip centering, go straight to APPROACH
+    m_autoPhase = AutoPhase::APPROACH;
     m_taskDone  = false;
 
     // Reset test sequencer
@@ -515,6 +515,7 @@ void Robot::AutonomousInit() {
     m_centerStep = 0;
     m_timer.Reset();
     m_timer.Start();
+    m_waypointStartTime_s = 0.0;  // timer starts at 0, so this matches
 
     // Clear NT completion flags so the Pi sees the reset
     m_taskDonePub.Set(false);
@@ -532,15 +533,17 @@ void Robot::AutonomousInit() {
     // Close hatch door
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
+    //JUST IN CASE, DELETE IF SOMETHIN HAPPENS
+    ResetPoseEstimator(m_initialPose_BACKUP, 0_m, 0_m, gyroAngle);
     // Raise arm immediately so beacon clears the arena during early turns
     m_armRaised = false;
     m_armDropped = false;
     ArmLower();
-
     // Safety stop
     RoboClawStopAll();
     RoboClawDrain();
     std::cout << "[Auto] AutonomousInit complete\n";
+    
 }
 
 // ============================================================================
@@ -562,19 +565,6 @@ void Robot::AutonomousInit() {
 // ============================================================================
 
 void Robot::AutonomousPeriodic() {
-    // ── 1. Raise Arm  ──────────────────────────────────────────────────
-    // Raise arm once at start of autonomous
-    /*if (!m_armRaised) {
-        ArmRaise();
-        m_armRaised = true;
-    }
-
-    // Lower arm once when waypoint 8 is reached
-    if (m_currentSetpointIndex >= 8 && !m_armDropped) {
-        ArmLower();
-        m_armDropped = true;
-    }*/
-
     // ── 2. Vision connection heartbeat ────────────────────────────────────
     // IsConnected() must be called every tick (it compares heartbeat counters).
     bool visionConnected = m_aprilTagReader.IsConnected();
@@ -588,6 +578,7 @@ void Robot::AutonomousPeriodic() {
     if (m_firstPidLoop) {
         m_prevTime    = now;
         m_firstPidLoop = false;
+        m_servoArm.SetPulseWidth(1400);
         return; // skip first cycle so dt is valid on the next call
     }
     dt = (now - m_prevTime).value();
@@ -1042,30 +1033,13 @@ void Robot::AutonomousPeriodic() {
                 StopAllDrive();
                 m_autoPhase = AutoPhase::DONE;
                 frc::SmartDashboard::PutString("Auto/Phase", "Done (path complete)");
+                std::cout << "[Auto] DONE — setpoints empty=" << m_setpoints.empty()
+                          << " autoComplete=" << m_autoComplete << "\n";
                 break;
             }
+            frc::SmartDashboard::PutNumber("Auto/Waypoint", m_currentSetpointIndex);
+            frc::SmartDashboard::PutNumber("Auto/SetpointCount", static_cast<double>(m_setpoints.size()));
             const auto& sp = m_setpoints[m_currentSetpointIndex];
-
-            //RAISE ARM AND LOWER ARM CONDITIONS
-            //SETPOINT 2 UP
-            //SETPOINT 22 Up
-            //SETPOINT 25 UP FOR RELEASING
-            //SETPOINT 42  Open
-            //Setpoint 52 Open
-
-            //SETPOINT 4 DROP
-            //SETPOINT 24 DROP            
-            //Setpoint 27 Down
-            //setpoint 45 Drop
-            //Setpoint 53 Drop
-            if (m_currentSetpointIndex == 2 || m_currentSetpointIndex == 22 || m_currentSetpointIndex == 25 ||
-            m_currentSetpointIndex == 42 || m_currentSetpointIndex == 52) {
-                ArmRaise();
-            }
-            if (m_currentSetpointIndex == 4 || m_currentSetpointIndex == 24 || m_currentSetpointIndex == 27 ||
-            m_currentSetpointIndex == 45 || m_currentSetpointIndex == 53) {
-                ArmLower();
-            }
             
             double x_target     = sp.x_trgt;
             double y_target     = sp.y_trgt;
@@ -1079,6 +1053,15 @@ void Robot::AutonomousPeriodic() {
 
             double x_error =  c * dx_field + s * dy_field;   // robot forward/back
             double y_error = -s * dx_field + c * dy_field;   // robot lateral
+
+            frc::SmartDashboard::PutNumber("PID/x_error", x_error);
+            frc::SmartDashboard::PutNumber("PID/y_error", y_error);
+            frc::SmartDashboard::PutNumber("PID/x_target", x_target);
+            frc::SmartDashboard::PutNumber("PID/y_target", y_target);
+            frc::SmartDashboard::PutNumber("PID/theta_target", theta_target);
+            frc::SmartDashboard::PutNumber("PID/x_pos", x_pos);
+            frc::SmartDashboard::PutNumber("PID/y_pos", y_pos);
+            frc::SmartDashboard::PutNumber("PID/theta_pos", theta_pos);
 
             // Outer loop: lateral error creates a heading reference correction
             double theta_ref = theta_target + y_to_theta_kP * y_error;
@@ -1096,9 +1079,9 @@ void Robot::AutonomousPeriodic() {
 
             // Gain scheduling for theta: larger P when heading error is large
             double abs_theta = std::abs(theta_error);
-            double sched_kP  = 25.0;
+            double sched_kP  = 20.0;
             if (abs_theta > std::numbers::pi / 4)
-                sched_kP = 80.0;
+                sched_kP = 60.0;
             else if (abs_theta > std::numbers::pi / 12)
                 sched_kP = 40.0;
 
@@ -1156,63 +1139,92 @@ void Robot::AutonomousPeriodic() {
                 RoboClawStopAll();
                 ResetPidState();
 
+                size_t wp = m_currentSetpointIndex;
+                double now_s = m_timer.Get().value();
+
                 // ── Beacon deposit dwell (waypoint 1) ────────────────────────
                 // Arm is already lowered from AutonomousInit. Hold position for
-                // kServoDwell_s so the beacon settles, then raise arm and advance.
-                if (m_currentSetpointIndex == 1) {
-                    double now = m_timer.Get().value();
+                // kServoDwell_s so beacon settles, then raise arm + dwell for arm.
+                if (wp == 1) {
                     if (m_servoCommandTime.value() < 0) {
-                        // First arrival — start dwell timer
-                        m_servoCommandTime = units::second_t(now);
+                        m_servoCommandTime = units::second_t(now_s);
+                        std::cout << "[Beacon] Dwelling for beacon deposit\n";
                         break;
                     }
-                    if ((now - m_servoCommandTime.value()) < kServoDwell_s) {
-                        break;  // still dwelling
-                    }
-                    // Done — raise arm, clear timer, fall through to advance
-                    ArmRaise();
+                    double elapsed = now_s - m_servoCommandTime.value();
+                    if (elapsed < kServoDwell_s) break;  // beacon settling
+                    ArmRaise();  // idempotent — called each tick during arm dwell
+                    if (elapsed < 2.0 * kServoDwell_s) break;  // arm moving
                     m_servoCommandTime = -1_s;
                     std::cout << "[Beacon] Deposit complete — arm raised\n";
                 }
 
-                // ── Ore deposit dwell (waypoint 9) ───────────────────────────
-                // Non-blocking: start extend on first arrival, poll each tick,
-                // retract when extend time elapses, advance when retract done.
-                bool isDepositWaypoint = (m_currentSetpointIndex == 9);
-                if (isDepositWaypoint) {
-                    double now = m_timer.Get().value();
+                // ── Arm raise waypoints (with dwell) ─────────────────────────
+                // WP  2: Pickup arm
+                // WP 22: Raise arm before bucket approach
+                // WP 25: Raise arm for releasing
+                // WP 28: Lift arm after grab
+                // WP 42: Open arm
+                // WP 52: Open arm (finish deposit)
+                if (wp == 8 || wp == 30 || wp == 31 || wp == 34 ||
+                    wp == 48 || wp == 58) {
+                    if (m_servoCommandTime.value() < 0) {
+                        ArmRaise();
+                        m_servoCommandTime = units::second_t(now_s);
+                        std::cout << "[Mechanism] ArmRaise at waypoint " << wp << "\n";
+                        break;
+                    }
+                    if (now_s - m_servoCommandTime.value() < kServoDwell_s) break;
+                    m_servoCommandTime = -1_s;
+                }
+
+                // ── Arm lower waypoints (with dwell) ─────────────────────────
+                // WP  4: Drop arm
+                // WP 24: Drop arm
+                // WP 27: Lower arm to grab
+                // WP 45: Drop arm
+                // WP 53: Close arm (cave entrance)
+                if (wp == 10 || wp == 30 || wp == 33 ||
+                    wp == 51 || wp == 59) {
+                    if (m_servoCommandTime.value() < 0) {
+                        ArmLower();
+                        m_servoCommandTime = units::second_t(now_s);
+                        std::cout << "[Mechanism] ArmLower at waypoint " << wp << "\n";
+                        break;
+                    }
+                    if (now_s - m_servoCommandTime.value() < kServoDwell_s) break;
+                    m_servoCommandTime = -1_s;
+                }
+
+                // ── Actuator deposit waypoints (extend → retract) ────────────
+                // WP 34: First ore deposit
+                // WP 51: Second ore deposit
+                // WP 87: Final deposit
+                if (wp == 34 || wp == 51 || wp == 87) {
                     if (m_actuatorDwellStep == 0) {
-                        // First arrival — start extending
                         ActuatorExtend(kActuatorSpeed);
-                        m_actuatorDwellStart_s = now;
+                        m_actuatorDwellStart_s = now_s;
                         m_actuatorDwellStep = 1;
-                        std::cout << "[Deposit] Extending actuator\n";
-                        break;  // come back next tick
+                        std::cout << "[Deposit] Extending actuator at waypoint " << wp << "\n";
+                        break;
                     } else if (m_actuatorDwellStep == 1) {
-                        // Waiting for full extension
-                        if (now - m_actuatorDwellStart_s < kActuatorRunTime_s) {
-                            break;  // still extending
-                        }
+                        if (now_s - m_actuatorDwellStart_s < kActuatorRunTime_s) break;
                         ActuatorStop();
                         ActuatorRetract(kActuatorSpeed);
-                        m_actuatorDwellStart_s = now;
+                        m_actuatorDwellStart_s = now_s;
                         m_actuatorDwellStep = 2;
-                        std::cout << "[Deposit] Retracting actuator\n";
+                        std::cout << "[Deposit] Retracting actuator at waypoint " << wp << "\n";
                         break;
                     } else if (m_actuatorDwellStep == 2) {
-                        // Waiting for full retraction
-                        if (now - m_actuatorDwellStart_s < kActuatorRunTime_s) {
-                            break;  // still retracting
-                        }
+                        if (now_s - m_actuatorDwellStart_s < kActuatorRunTime_s) break;
                         ActuatorStop();
-                        m_actuatorDwellStep = 0;  // reset for next deposit
-                        std::cout << "[Deposit] Done\n";
-                        // fall through to advance
+                        m_actuatorDwellStep = 0;
+                        std::cout << "[Deposit] Complete at waypoint " << wp << "\n";
                     }
                 }
 
-                // ── Path / TAG_SEARCH handoff ─────────────────────────────────
-                if (m_currentSetpointIndex == kTagHandoffWaypoint) {
+                // ── Path / TAG_SEARCH handoff ────────────────────────────────
+                if (wp == kTagHandoffWaypoint) {
                     m_timer.Reset();
                     m_timer.Start();
                     m_autoPhase = AutoPhase::TAG_SEARCH;
@@ -1247,6 +1259,11 @@ void Robot::AutonomousPeriodic() {
             if (xr_cmd < 0.0 && xr_cmd > -25.0) xr_cmd = -25.0;
             if (xl_cmd > 0.0 && xl_cmd < 25.0) xl_cmd = 25.0;
             if (xl_cmd < 0.0 && xl_cmd > -25.0) xl_cmd = -25.0;
+
+            frc::SmartDashboard::PutNumber("PID/x_cmd", x_cmd);
+            frc::SmartDashboard::PutNumber("PID/theta_cmd", theta_cmd);
+            frc::SmartDashboard::PutNumber("PID/xr_cmd", xr_cmd);
+            frc::SmartDashboard::PutNumber("PID/xl_cmd", xl_cmd);
 
             double spdr = std::abs(xr_cmd);
             double spdl = std::abs(xl_cmd);
