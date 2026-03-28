@@ -213,7 +213,7 @@ class Robot : public frc::TimesliceRobot {
   static constexpr size_t kTagHandoffWaypoint = 10;
 
   // How long (seconds) to spend on one waypoint before skipping to the next.
-  static constexpr double kWaypointTimeout_s = 5.0;
+  static constexpr double kWaypointTimeout_s = 8.0;
   double m_waypointStartTime_s = 0.0;  // m_timer snapshot when current waypoint began
 
   // Servo pulse widths (microseconds)
