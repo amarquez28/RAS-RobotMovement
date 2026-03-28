@@ -489,7 +489,7 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine — skip centering, go straight to APPROACH
-    m_autoPhase = AutoPhase::APPROACH;
+    m_autoPhase = AutoPhase::TEST;
     m_taskDone  = false;
 
     // Reset test sequencer
@@ -593,7 +593,6 @@ void Robot::AutonomousPeriodic() {
     units::meter_t xl_pos = units::meter_t{e80_m2 * kXMetPerPul};
     units::meter_t xr_pos = units::meter_t{e80_m1 * kXMetPerPul};
     frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
-    double rawStrafeY_m = e81_m1 * kYMetPerPul;
 
     frc::Pose2d estPose = UpdatePoseEstimator(now, xl_pos, xr_pos, gyroAngle);
 
@@ -676,84 +675,65 @@ void Robot::AutonomousPeriodic() {
     {
     case AutoPhase::TEST:
     {
+        // ═══════════════════════════════════════════════════════════════
+        //  ARM SERVO TUNING
+        //
+        //  Step 0 → Set arm to OPEN (raised) — 3s hold
+        //  Step 2 → Set arm to INIT (lowered) — 3s hold
+        //  Step 4 → Done, hold at INIT
+        //
+        //  Tuning workflow:
+        //    1. Disconnect arm from servo horn
+        //    2. Deploy code — servo goes to ArmServoOpenPos first
+        //    3. Attach arm at desired "highest" position
+        //    4. Restart auto — watch it go OPEN → INIT
+        //    5. Adjust ArmServoInitPos in Robot.h until "down" is right
+        // ═══════════════════════════════════════════════════════════════
+
         StopAllDrive();
-        frc::SmartDashboard::PutString("Auto/Phase", "TEST");
+        double now_s = m_timer.Get().value();
+        constexpr double kTestDwell_s = 20.0;
 
-        // ── Connection / heartbeat ───────────────────────────────────────
-        bool visionConnected = m_aprilTagReader.IsConnected();
-        frc::SmartDashboard::PutBoolean("Test/Vision Connected", visionConnected);
-        frc::SmartDashboard::PutBoolean("Test/Has Target", hasTag);
-        frc::SmartDashboard::PutNumber("Test/Tag Count", m_aprilTagReader.GetTagCount());
-
-        // ── Primary tag raw data ─────────────────────────────────────────
-        if (hasTag) {
-            frc::SmartDashboard::PutNumber("Test/Primary ID", tag.id);
-            frc::SmartDashboard::PutNumber("Test/Primary Pixel X", tag.x);
-            frc::SmartDashboard::PutNumber("Test/Primary Pixel Y", tag.y);
-            frc::SmartDashboard::PutNumber("Test/Primary Distance (m)", tag.distance);
-
-            // Camera-relative pose (tilt-corrected by Pi)
-            frc::SmartDashboard::PutNumber("Test/Pose TX (m)", tag.pose_tx);
-            frc::SmartDashboard::PutNumber("Test/Pose TY (m)", tag.pose_ty);
-            frc::SmartDashboard::PutNumber("Test/Pose TZ (m)", tag.pose_tz);
-
-            // Detection quality
-            frc::SmartDashboard::PutNumber("Test/Pose Error", tag.pose_err);
-            frc::SmartDashboard::PutNumber("Test/Decision Margin", tag.decision_margin);
-
-            // Capture timestamp (FPGA µs, -1 if not synced)
-            frc::SmartDashboard::PutNumber("Test/Timestamp us", static_cast<double>(tag.timestamp_us));
-        } else {
-            frc::SmartDashboard::PutNumber("Test/Primary ID", -1);
-            frc::SmartDashboard::PutNumber("Test/Primary Distance (m)", -1.0);
+        // ── Step 0: Command arm to OPEN (raised) ──
+        if (m_testStep == 0) {
+            m_servoArm.SetPulseWidth(ArmServoOpenPos);
+            std::cout << "[Tune] Arm → OPEN (" << ArmServoOpenPos << " us) — attach arm here for highest point\n";
+            m_servoCommandTime = units::second_t(now_s);
+            m_testStep = 1;
+            break;
         }
-
-        // ── Field-relative robot pose (computed by Pi) ───────────────────
-        frc::SmartDashboard::PutBoolean("Test/Field Pose Valid", fieldPose.valid);
-        frc::SmartDashboard::PutNumber("Test/Field X (m)", fieldPose.x);
-        frc::SmartDashboard::PutNumber("Test/Field Y (m)", fieldPose.y);
-        frc::SmartDashboard::PutNumber("Test/Field Theta (rad)", fieldPose.theta);
-        frc::SmartDashboard::PutNumber("Test/Field Theta (deg)", fieldPose.theta * 180.0 / std::numbers::pi);
-
-        // ── Encoder odometry vs vision comparison ────────────────────────
-        // These are already computed above as x_pos, y_pos, theta_pos
-        frc::SmartDashboard::PutNumber("Test/Odom X (m)", x_pos);
-        frc::SmartDashboard::PutNumber("Test/Odom Y (m)", y_pos);
-        frc::SmartDashboard::PutNumber("Test/Odom Theta (rad)", theta_pos);
-
-        // Difference: vision field pose minus encoder odometry
-        if (fieldPose.valid) {
-            frc::SmartDashboard::PutNumber("Test/Delta X (m)", fieldPose.x - x_pos);
-            frc::SmartDashboard::PutNumber("Test/Delta Y (m)", fieldPose.y - y_pos);
-            frc::SmartDashboard::PutNumber("Test/Delta Theta (rad)", fieldPose.theta - theta_pos);
+        // ── Step 1: Hold at OPEN ──
+        if (m_testStep == 1) {
+            double elapsed = now_s - m_servoCommandTime.value();
+            frc::SmartDashboard::PutString("Test/Servo", "Arm OPEN " + std::to_string(ArmServoOpenPos) + " us");
+            frc::SmartDashboard::PutNumber("Test/Dwell Remaining", kTestDwell_s - elapsed);
+            if (elapsed < kTestDwell_s) break;
+            m_testStep = 2;
         }
-
-        // ── IMU heading ──────────────────────────────────────────────────
-        frc::SmartDashboard::PutNumber("Test/IMU Theta (rad)", m_thetaRad);
-        frc::SmartDashboard::PutNumber("Test/IMU Theta (deg)", m_thetaRad * 180.0 / std::numbers::pi);
-
-        // ── All visible tags ─────────────────────────────────────────────
-        auto allTags = m_aprilTagReader.GetAllTags();
-        std::string tagList = "";
-        for (size_t i = 0; i < allTags.size(); i++) {
-            const auto& t = allTags[i];
-            std::string prefix = "Test/Tag[" + std::to_string(i) + "]/";
-            frc::SmartDashboard::PutNumber(prefix + "ID", t.id);
-            frc::SmartDashboard::PutNumber(prefix + "Distance (m)", t.distance);
-            frc::SmartDashboard::PutNumber(prefix + "Pose TX (m)", t.pose_tx);
-            frc::SmartDashboard::PutNumber(prefix + "Pose TY (m)", t.pose_ty);
-            frc::SmartDashboard::PutNumber(prefix + "Pose TZ (m)", t.pose_tz);
-            if (i > 0) tagList += ", ";
-            tagList += std::to_string(t.id);
+        // ── Step 2: Command arm to INIT (lowered) ──
+        if (m_testStep == 2) {
+            m_servoArm.SetPulseWidth(ArmServoInitPos);
+            std::cout << "[Tune] Arm → INIT (" << ArmServoInitPos << " us)\n";
+            m_servoCommandTime = units::second_t(now_s);
+            m_testStep = 3;
+            break;
         }
-        frc::SmartDashboard::PutString("Test/Visible Tags", tagList);
-
-        // ── Latency estimate ─────────────────────────────────────────────
-        if (hasTag && tag.timestamp_us > 0) {
-            auto fpgaNow = frc::Timer::GetFPGATimestamp();
-            int64_t fpgaNow_us = static_cast<int64_t>(fpgaNow.value() * 1e6);
-            double latency_ms = (fpgaNow_us - tag.timestamp_us) / 1000.0;
-            frc::SmartDashboard::PutNumber("Test/Vision Latency (ms)", latency_ms);
+        // ── Step 3: Hold at INIT ──
+        if (m_testStep == 3) {
+            double elapsed = now_s - m_servoCommandTime.value();
+            frc::SmartDashboard::PutString("Test/Servo", "Arm INIT " + std::to_string(ArmServoInitPos) + " us");
+            frc::SmartDashboard::PutNumber("Test/Dwell Remaining", kTestDwell_s - elapsed);
+            if (elapsed < kTestDwell_s) break;
+            m_testStep = 4;
+        }
+        // ── Step 4: Done ──
+        if (m_testStep >= 4) {
+            m_servoArm.SetPulseWidth(ArmServoInitPos);
+            frc::SmartDashboard::PutString("Test/Servo", "DONE — holding INIT");
+            if (m_testStep == 4) {
+                std::cout << "[Tune] DONE  Arm OPEN=" << ArmServoOpenPos << "  INIT=" << ArmServoInitPos << " us\n";
+                m_testStep = 5;  // latch
+            }
         }
 
         break;
@@ -881,10 +861,6 @@ void Robot::AutonomousPeriodic() {
             else                   RoboClawM2Forward  (kRoboClawAddr_Drive, 0);
 
         }
-
-        break;
-    }
-
         break;
     }
 
@@ -1142,13 +1118,6 @@ void Robot::AutonomousPeriodic() {
             if (theta_cmd < 0.0 && theta_cmd > -15.0) theta_cmd = -15.0;
             if (y_cmd > 0.0 && y_cmd < 25.0) y_cmd = 25.0;
             if (y_cmd < 0.0 && y_cmd > -25.0) y_cmd = -25.0;
-
-            if (!m_enableYControl) {
-                y_cmd = 0.0;
-                y_integral = 0.0;
-                y_prevError = 0.0;
-                y_deriv = 0.0;
-            }
 
             // Differential mixing for drive wheels
             double xr_cmd = std::clamp(x_cmd + theta_cmd, -127.0, 127.0);
