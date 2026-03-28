@@ -565,19 +565,6 @@ void Robot::AutonomousInit() {
 // ============================================================================
 
 void Robot::AutonomousPeriodic() {
-    // ── 1. Raise Arm  ──────────────────────────────────────────────────
-    // Raise arm once at start of autonomous
-    /*if (!m_armRaised) {
-        ArmRaise();
-        m_armRaised = true;
-    }
-
-    // Lower arm once when waypoint 8 is reached
-    if (m_currentSetpointIndex >= 8 && !m_armDropped) {
-        ArmLower();
-        m_armDropped = true;
-    }*/
-
     // ── 2. Vision connection heartbeat ────────────────────────────────────
     // IsConnected() must be called every tick (it compares heartbeat counters).
     bool visionConnected = m_aprilTagReader.IsConnected();
@@ -1038,28 +1025,6 @@ void Robot::AutonomousPeriodic() {
             frc::SmartDashboard::PutNumber("Auto/Waypoint", m_currentSetpointIndex);
             frc::SmartDashboard::PutNumber("Auto/SetpointCount", static_cast<double>(m_setpoints.size()));
             const auto& sp = m_setpoints[m_currentSetpointIndex];
-
-            //RAISE ARM AND LOWER ARM CONDITIONS
-            //SETPOINT 2 UP
-            //SETPOINT 22 Up
-            //SETPOINT 25 UP FOR RELEASING
-            //SETPOINT 42  Open
-            //Setpoint 52 Open
-
-            //SETPOINT 4 DROP
-            //SETPOINT 24 DROP            
-            //Setpoint 27 Down
-            //setpoint 45 Drop
-            //Setpoint 53 Drop
-            
-            if (m_currentSetpointIndex == 2 || m_currentSetpointIndex == 22 || m_currentSetpointIndex == 25 ||
-            m_currentSetpointIndex == 40 || m_currentSetpointIndex == 52) {
-                ArmRaise();
-            }
-            if (m_currentSetpointIndex == 4 || m_currentSetpointIndex == 24 || m_currentSetpointIndex == 27 ||
-            m_currentSetpointIndex == 42 || m_currentSetpointIndex == 53) {
-                ArmLower();
-            }
             
             double x_target     = sp.x_trgt;
             double y_target     = sp.y_trgt;
