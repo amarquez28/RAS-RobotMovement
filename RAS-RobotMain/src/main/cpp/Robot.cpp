@@ -536,7 +536,7 @@ void Robot::AutonomousInit() {
     m_armRaised = false;
     m_armDropped = false;
     ArmLower();
-
+    bool firstloop = true;
     // Safety stop
     RoboClawStopAll();
     RoboClawDrain();
@@ -1043,6 +1043,12 @@ void Robot::AutonomousPeriodic() {
             //Setpoint 27 Down
             //setpoint 45 Drop
             //Setpoint 53 Drop
+           
+            if (firstloop = true)
+            {
+                m_servoArm.SetPulseWidth(1400);
+            }
+            
             if (m_currentSetpointIndex == 2 || m_currentSetpointIndex == 22 || m_currentSetpointIndex == 25 ||
             m_currentSetpointIndex == 42 || m_currentSetpointIndex == 52) {
                 ArmRaise();

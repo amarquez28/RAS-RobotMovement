@@ -133,6 +133,7 @@ class Robot : public frc::TimesliceRobot {
 
   //Pose initial point, first setpoint
   frc::Pose2d m_initialPose{0.78_m, 0.48_m, frc::Rotation2d{0_rad}}; //change values, wait for Justice
+  frc::Pose2d m_initialPose_BACKUP{0.81_m, 0.16_m, frc::Rotation2d{0_rad}};
 
   //Estimator declaration
   frc::DifferentialDrivePoseEstimator field_poseEstimator{
@@ -187,6 +188,7 @@ class Robot : public frc::TimesliceRobot {
   static constexpr double kBeaconApproachDist_m = 0.13;  // stop 13cm from tag
   static constexpr double kBeaconDwell_s = 1.5;          // time to drop beacon
 
+  bool firstloop;
   // PID Tuning gains
   double x_kP = 130.0;
   double x_kI = 18.0;
@@ -194,7 +196,7 @@ class Robot : public frc::TimesliceRobot {
   double y_kP = 300.0;
   double y_kI = 55.0;
   double y_kD = 0.01;
-  double y_to_theta_kP = 3.0;
+  double y_to_theta_kP = 10.0;
   double theta_kI = 5.0;
   double theta_kD = 0.3;
   // Forward/Backward wheel PID state
