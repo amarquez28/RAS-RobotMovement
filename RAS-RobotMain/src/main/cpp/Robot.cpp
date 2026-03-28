@@ -534,7 +534,6 @@ void Robot::AutonomousInit() {
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
     //JUST IN CASE, DELETE IF SOMETHIN HAPPENS
-    ResetPoseEstimator(m_initialPose_BACKUP, 0_m, 0_m, gyroAngle);
     // Raise arm immediately so beacon clears the arena during early turns
     m_armRaised = false;
     m_armDropped = false;
@@ -542,6 +541,8 @@ void Robot::AutonomousInit() {
     // Safety stop
     RoboClawStopAll();
     RoboClawDrain();
+    ResetPoseEstimator(m_initialPose_BACKUP, 0_m, 0_m, gyroAngle);
+
     std::cout << "[Auto] AutonomousInit complete\n";
     
 }
@@ -1064,11 +1065,11 @@ void Robot::AutonomousPeriodic() {
 
             // Gain scheduling for theta: larger P when heading error is large
             double abs_theta = std::abs(theta_error);
-            double sched_kP  = 30.0;
+            double sched_kP  = 23.0;
             if (abs_theta > std::numbers::pi / 4)
-                sched_kP = 90.0;
+                sched_kP = 50.0;
             else if (abs_theta > std::numbers::pi / 12)
-                sched_kP = 60.0;
+                sched_kP = 37.0;
 
             double x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv;
             double y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv;
@@ -1151,8 +1152,7 @@ void Robot::AutonomousPeriodic() {
                 // WP 28: Lift arm after grab
                 // WP 42: Open arm
                 // WP 52: Open arm (finish deposit)
-                if (wp == 8 || wp == 30 || wp == 31 || wp == 34 ||
-                    wp == 48 || wp == 58) {
+                if (wp == 8 || wp == 20 || wp == 26) {
                     if (m_servoCommandTime.value() < 0) {
                         ArmRaise();
                         m_servoCommandTime = units::second_t(now_s);
@@ -1169,8 +1169,8 @@ void Robot::AutonomousPeriodic() {
                 // WP 27: Lower arm to grab
                 // WP 45: Drop arm
                 // WP 53: Close arm (cave entrance)
-                if (wp == 10 || wp == 30 || wp == 33 ||
-                    wp == 51 || wp == 59) {
+                if (wp == 9 || wp == 22 || wp == 27 ||
+                    wp == 35) {
                     if (m_servoCommandTime.value() < 0) {
                         ArmLower();
                         m_servoCommandTime = units::second_t(now_s);
@@ -1185,7 +1185,7 @@ void Robot::AutonomousPeriodic() {
                 // WP 34: First ore deposit
                 // WP 51: Second ore deposit
                 // WP 87: Final deposit
-                if (wp == 34 || wp == 51 || wp == 87) {
+                if (wp == 80 || wp == 74) {
                     if (m_actuatorDwellStep == 0) {
                         ActuatorExtend(kActuatorSpeed);
                         m_actuatorDwellStart_s = now_s;
