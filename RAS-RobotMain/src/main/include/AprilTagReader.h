@@ -21,11 +21,13 @@
  * +x toward cave, +y toward left wall, +theta CCW).
  */
 struct FieldPose {
-    double x;           // Robot X position on field (metres)
-    double y;           // Robot Y position on field (metres)
-    double theta;       // Robot heading (radians, 0 = +x, CCW positive)
+    double x;             // Robot X position on field (metres)
+    double y;             // Robot Y position on field (metres)
+    double theta;         // Robot heading (radians, 0 = +x, CCW positive)
+    double confidence;    // Detection confidence (decision_margin, higher = better, ignore < 40)
     int64_t timestamp_us; // Capture timestamp in FPGA time (microseconds)
-    bool valid;         // True if a known tag was used to compute this pose
+    bool valid;           // True if a known tag was used to compute this pose
+    bool isNew;           // True if this is a new measurement (timestamp changed since last call)
 };
 
 struct AprilTagData {
@@ -147,8 +149,14 @@ public:
         pose.x = m_robotFieldXSub.Get();
         pose.y = m_robotFieldYSub.Get();
         pose.theta = m_robotFieldThetaSub.Get();
+        pose.confidence = m_tagDecisionMarginSub.Get();
         pose.timestamp_us = m_tagTimestampSub.Get();
-        pose.valid = m_tagDetectedSub.Get();
+        pose.valid = m_tagDetectedSub.Get() && (pose.confidence >= 40.0);
+
+        // Flag whether this is a new measurement since the last call
+        pose.isNew = (pose.timestamp_us != m_lastFieldPoseTimestamp) && (pose.timestamp_us > 0);
+        m_lastFieldPoseTimestamp = pose.timestamp_us;
+
         return pose;
     }
 
@@ -280,6 +288,9 @@ private:
     nt::DoubleSubscriber m_robotFieldXSub;
     nt::DoubleSubscriber m_robotFieldYSub;
     nt::DoubleSubscriber m_robotFieldThetaSub;
+
+    // Field pose staleness tracking
+    int64_t m_lastFieldPoseTimestamp = -1;
 
     // Connection monitoring
     nt::IntegerSubscriber m_heartbeatSub;
