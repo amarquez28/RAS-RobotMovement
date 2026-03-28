@@ -1,5 +1,11 @@
 {
   "NetworkTables": {
+    "Persistent Values": {
+      "open": false
+    },
+    "Retained Values": {
+      "open": false
+    },
     "retained": {
       "SmartDashboard": {
         "Auto Modes": {
@@ -34,9 +40,12 @@
     }
   },
   "NetworkTables Info": {
+    "Connections": {
+      "open": true
+    },
     "visible": true
   },
   "NetworkTables Settings": {
-    "mode": "Client (NT3)"
+    "mode": "Client (NT4)"
   }
 }
