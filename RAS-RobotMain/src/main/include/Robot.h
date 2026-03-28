@@ -294,7 +294,7 @@ class Robot : public frc::TimesliceRobot {
 
   //lateral correction speed for centering on the tag (0-127)
   //applied as a strafe blend when the tag is off-center in the camera frame
-  static constexpr uint8_t kCenterSpeed = 20;
+  static constexpr uint8_t kCenterSpeed = 80;
 
 // ── Camera centering constants ────────────────────────────────────────
   //
