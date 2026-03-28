@@ -74,9 +74,7 @@ Robot::Robot() : frc::TimesliceRobot{5_ms, 10_ms} {
     auto inst  = nt::NetworkTableInstance::GetDefault();
     auto table = inst.GetTable("Vision");
     m_taskDonePub  = table->GetBooleanTopic("task_done").Publish();
-    m_sweepDonePub = table->GetBooleanTopic("sweep_done").Publish();
     m_taskDonePub.Set(false);
-    m_sweepDonePub.Set(false);
 }
 
 // ============================================================================
@@ -186,7 +184,6 @@ void Robot::RoboClawResetEncoder(uint8_t addr) {
 
 void Robot::RoboClawResetAllEncoders() {
     RoboClawResetEncoder(kRoboClawAddr_Drive);
-    RoboClawResetEncoder(kRoboClawAddr_Strafe);
 }
 
 // ── Per-motor direction wrappers ─────────────────────────────────────────────
@@ -201,7 +198,6 @@ void Robot::RoboClawStop(uint8_t addr) {
 }
 void Robot::RoboClawStopAll() {
     RoboClawStop(kRoboClawAddr_Drive);
-    RoboClawStop(kRoboClawAddr_Strafe);
 }
 
 // ============================================================================
@@ -219,16 +215,6 @@ void Robot::DriveVertical(int8_t speed) {
         RoboClawM2Backward(kRoboClawAddr_Drive, s);
     } else {
         RoboClawStop(kRoboClawAddr_Drive);
-    }
-}
-
-void Robot::DriveHorizontal(int8_t speed) {
-    if (speed > 0) {
-        RoboClawM1Forward(kRoboClawAddr_Strafe, static_cast<uint8_t>(speed));
-    } else if (speed < 0) {
-        RoboClawM1Backward(kRoboClawAddr_Strafe, static_cast<uint8_t>(-speed));
-    } else {
-        RoboClawM1Forward(kRoboClawAddr_Strafe, 0);
     }
 }
 
@@ -354,20 +340,16 @@ void Robot::CalibrateGyroZBias() {
 // ============================================================================
 
 void Robot::UpdateEncoders() {
-    uint8_t s1, s2;
-    int32_t raw1 = 0, raw2 = 0;
+    uint8_t s1;
+    int32_t raw1 = 0;
 
     bool ok1 = RoboClawReadEncoderM1(kRoboClawAddr_Drive,  raw1, s1);
-    bool ok2 = RoboClawReadEncoderM1(kRoboClawAddr_Strafe, raw2, s2);
 
-    m_encodersValid = ok1 && ok2;
+    m_encodersValid = ok1;
     if (ok1) m_vertTicks  = raw1;
-    if (ok2) m_horizTicks = raw2;
 
     frc::SmartDashboard::PutBoolean("Enc/DriveOK",   ok1);
-    frc::SmartDashboard::PutBoolean("Enc/StrafeOK",  ok2);
     frc::SmartDashboard::PutNumber ("Enc/VertTicks",  m_vertTicks);
-    frc::SmartDashboard::PutNumber ("Enc/HorizTicks", m_horizTicks);
 }
 
 // ============================================================================
@@ -519,7 +501,6 @@ void Robot::AutonomousInit() {
 
     // Clear NT completion flags so the Pi sees the reset
     m_taskDonePub.Set(false);
-    m_sweepDonePub.Set(false);
 
     // Reset PID integrators
     ResetPidState();
@@ -528,7 +509,6 @@ void Robot::AutonomousInit() {
     // we then overwrite with 0 so sweep distances are relative)
     //UpdateEncoders();
     //m_vertTicks  = 0;
-    //m_horizTicks = 0;
 
     // Close hatch door
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
@@ -599,19 +579,16 @@ void Robot::AutonomousPeriodic() {
     constexpr double kXMetPerPul  = kWheelCirc / 758.8;
     constexpr double kYMetPerPul  = kWheelCirc / 1425.1;
 
-    int32_t e80_m1 = 0, e80_m2 = 0, e81_m1 = 0;
-    uint8_t s80_m1,     s80_m2,     s81_m1;
+    int32_t e80_m1 = 0, e80_m2 = 0;
+    uint8_t s80_m1,     s80_m2;
 
     bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr_Drive,  e80_m1, s80_m1);
     bool ok80_2 = RoboClawReadEncoderM2(kRoboClawAddr_Drive,  e80_m2, s80_m2);
-    bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr_Strafe, e81_m1, s81_m1);
 
     frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok80_1);
     frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok80_2);
-    frc::SmartDashboard::PutBoolean("RC2 Encoder1 OK", ok81_1);
     if (ok80_1) frc::SmartDashboard::PutNumber("RC1 Encoder1", static_cast<double>(e80_m1));
     if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", static_cast<double>(e80_m2));
-    if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", static_cast<double>(e81_m1));
 
     units::meter_t xl_pos = units::meter_t{e80_m2 * kXMetPerPul};
     units::meter_t xr_pos = units::meter_t{e80_m1 * kXMetPerPul};
@@ -628,9 +605,6 @@ void Robot::AutonomousPeriodic() {
     frc::SmartDashboard::PutNumber("Pose/Y_m", y_pos);
     frc::SmartDashboard::PutNumber("Pose/Theta_rad", theta_pos);
     frc::SmartDashboard::PutNumber("Pose/Theta_rad IMU", m_thetaRad);
-
-    // optional: keep raw strafe encoder visible for debugging
-    frc::SmartDashboard::PutNumber("Pose/RawStrafeY_m", rawStrafeY_m);
 
     // ── 6. Read AprilTag ──────────────────────────────────────────────────
     bool hasTag = m_aprilTagReader.HasTarget();
@@ -811,7 +785,6 @@ void Robot::AutonomousPeriodic() {
             ResetPidState();
             RoboClawResetAllEncoders();
             m_vertTicks  = 0;
-            m_horizTicks = 0;
             m_waypointStartTime_s = m_timer.Get().value();
             m_autoPhase  = AutoPhase::APPROACH;
             frc::SmartDashboard::PutNumber("Auto/TagId", tagId);
@@ -907,85 +880,10 @@ void Robot::AutonomousPeriodic() {
             else if (xl_cmd < 0.0) RoboClawM2Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdl));
             else                   RoboClawM2Forward  (kRoboClawAddr_Drive, 0);
 
-            // Strafe (M1 on 0x81)
-            if      (y_cmd > 0.0) RoboClawM1Forward (kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
-            else if (y_cmd < 0.0) RoboClawM1Backward(kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
-            else                  RoboClawM1Forward  (kRoboClawAddr_Strafe, 0);
-
         }
 
         break;
     }
-
-    // ── CENTERING: strafe until AprilTag is centered in camera frame ─────
-    // Non-blocking: each tick checks the pixel error and issues a single
-    // DriveHorizontal command, then returns. No while loops.
-    // When centered (or timed out), resets encoders + IMU and starts path.
-    case AutoPhase::CENTERING: {
-        frc::SmartDashboard::PutString("Auto/Phase", "Centering");
-
-        if (!hasTag) {
-            // Strafe +y until we see an AprilTag
-            // Pulse drive motors briefly to break static friction, then stop pulsing
-            static constexpr double kShakeDuration_s = 1.0;  // shake for 1 second
-            double elapsed = m_timer.Get().value();
-            if (elapsed <= kShakeDuration_s) {
-                int pulse = static_cast<int>(elapsed * 10) % 2; // toggle ~5Hz
-                int8_t jog = pulse ? static_cast<int8_t>(35) : static_cast<int8_t>(-35);
-                DriveVertical(jog);
-            } else {
-                DriveVertical(0);
-            }
-            DriveHorizontal(static_cast<int8_t>(kCenterSpeed));
-        } else {
-            double pixelError = tag.x - kCameraCenter_px;
-            frc::SmartDashboard::PutNumber("Auto/CenterError_px", pixelError);
-
-            if (std::abs(pixelError) <= kCenterTolerance_px) {
-                // Centered — reset odometry and transition to APPROACH
-                StopAllDrive();
-                RoboClawResetAllEncoders();
-                m_firstPidLoop = true;
-                ResetPidState();
-
-                if (fieldPose.valid) {
-                    m_thetaRad = fieldPose.theta;
-                    m_yaw_rad  = fieldPose.theta;
-
-                    frc::Pose2d visionStartPose{
-                        units::meter_t{fieldPose.x},
-                        units::meter_t{fieldPose.y},
-                        frc::Rotation2d{units::radian_t{fieldPose.theta}}
-                    };
-                    frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
-                    ResetPoseEstimator(visionStartPose, 0_m, 0_m, gyroAngle);
-                    std::cout << "[Center] Centered (error=" << pixelError
-                              << "px) — starting from VISION pose ("
-                              << fieldPose.x << ", " << fieldPose.y << ", "
-                              << fieldPose.theta << ")\n";
-                } else {
-                    m_thetaRad = 0.0;
-                    m_yaw_rad  = 0.0;
-                    frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
-                    ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
-                    std::cout << "[Center] Centered (error=" << pixelError
-                              << "px) — vision invalid, starting from INITIAL pose\n";
-                }
-
-                m_waypointStartTime_s = m_timer.Get().value();
-                m_autoPhase = AutoPhase::APPROACH;
-            } else {
-                // Proportional strafe: full speed when far off, slow down near center
-                // to avoid overshooting the deadband
-                double proportion = std::abs(pixelError) / 300.0;  // ramp over 300px
-                proportion = std::clamp(proportion, 0.0, 1.0);
-                int8_t minSpeed = 25;  // minimum to overcome friction
-                int8_t speed = static_cast<int8_t>(minSpeed + proportion * (kCenterSpeed - minSpeed));
-                int8_t strafeSpeed = (pixelError > 0) ? speed : -speed;
-                DriveVertical(0);  // stop drive motors so we don't spin
-                DriveHorizontal(strafeSpeed);
-            }
-        }
 
         break;
     }
@@ -998,7 +896,7 @@ void Robot::AutonomousPeriodic() {
         if (hasTag) {
             // Seed the PID setpoint to the tag's current reported distance.
             // x_target = current x position + tag distance (drive toward it).
-            // y_target = current y position (no lateral target yet).
+            // y_error is used to steer toward the target via theta correction.
             // theta_target = current heading (hold straight).
             // These will be updated live inside APPROACH every tick.
             m_waypointStartTime_s = m_timer.Get().value();
@@ -1132,7 +1030,7 @@ void Robot::AutonomousPeriodic() {
             }
 
             bool x_done     = (std::abs(x_error)     <= kXTol);
-            bool y_done = !m_enableYControl || (std::abs(y_error) <= kYTol);
+            bool y_done     = true;  // no strafe — always done
             bool theta_done = (std::abs(theta_error) <= kThetaTol);
 
             if (x_done && y_done && theta_done) {
@@ -1279,8 +1177,6 @@ void Robot::AutonomousPeriodic() {
             else if (xl_cmd < 0.0) RoboClawM2Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdl));
             else                   RoboClawM2Forward  (kRoboClawAddr_Drive, 0);
 
-            RoboClawM1Forward(kRoboClawAddr_Strafe, 0);
-
             // PID telemetry
             frc::SmartDashboard::PutNumber("PID/WaypointIndex",
                 static_cast<double>(m_currentSetpointIndex));
@@ -1308,7 +1204,6 @@ void Robot::AutonomousPeriodic() {
     // ── 8. General dashboard ─────────────────────────────────────────────
     frc::SmartDashboard::PutNumber("Auto/ElapsedTime_s", m_timer.Get().value());
     frc::SmartDashboard::PutNumber("Auto/VertTicks",     m_vertTicks);
-    frc::SmartDashboard::PutNumber("Auto/HorizTicks",    m_horizTicks);
 }
 
 // ============================================================================
@@ -1317,17 +1212,17 @@ void Robot::AutonomousPeriodic() {
 
 // Extends the ore-deposit plate forward.
 void Robot::ActuatorExtend(uint8_t speed) {
-    RoboClawM2Forward(kRoboClawAddr_Strafe, speed);
+    RoboClawM2Forward(kRoboClawAddr_Actuator, speed);
 }
 
 // Retracts the ore-deposit plate back.
 void Robot::ActuatorRetract(uint8_t speed) {
-    RoboClawM2Backward(kRoboClawAddr_Strafe, speed);
+    RoboClawM2Backward(kRoboClawAddr_Actuator, speed);
 }
 
 // Stops the actuator in place.
 void Robot::ActuatorStop() {
-    RoboClawM2Forward(kRoboClawAddr_Strafe, 0);
+    RoboClawM2Forward(kRoboClawAddr_Actuator, 0);
 }
 
 // ============================================================================

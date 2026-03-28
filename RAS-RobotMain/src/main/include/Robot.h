@@ -20,7 +20,6 @@
 #include <frc/SerialPort.h> //UART communication with Roboclaw
 #include <frc/I2C.h>
 #include "AprilTagReader.h"
-#include "SweepController.h"
 #include <vector>
 #include <AutonomousPaths.h>
 
@@ -33,7 +32,6 @@
 #include <units/angle.h>
 
 // ── Autonomous phase ─────────────────────────────────────────────────────────
-// CENTERING : Strafe until the AprilTag is centered in the camera frame.
 //             Resets encoders + IMU when done, then transitions to APPROACH.
 // SEARCH    : No tag visible yet – robot holds position and waits.
 // APPROACH  : Running a waypoint path via PID dead-reckoning.
@@ -66,12 +64,10 @@ class Robot : public frc::TimesliceRobot {
   // ── high-level drive helpers ────────────────────────────────────────────
   // speed: -127 (full back) to +127 (full forward)
   void DriveVertical(int8_t speed);
-  // speed: -127 (full left) to +127 (full right)
-  void DriveHorizontal(int8_t speed);
   void StopAllDrive();
 
   // Differential steering: drives M1 and M2 at different speeds to turn
-  // while moving. Used during tag approach instead of strafe.
+  // while moving. Used during tag approach for steering.
   // baseSpeed: signed (negative = backing toward rear camera / tag)
   // pixelError: tag.x - kCameraCenter_px (positive = tag right of centre)
   void DriveTankSteered(int8_t baseSpeed, double pixelError);
@@ -89,10 +85,10 @@ class Robot : public frc::TimesliceRobot {
   frc::SerialPort m_roboclaw{38400, frc::SerialPort::Port::kMXP};
 
   // RoboClaw addresses
-  // 0x80 → RC1: M1 = Right drive motor, M2 = Left drive motor (vertical)  
-  // 0x81 → RC2: M1 = Strafe motor                               (horizontal)
+  // 0x80 → RC1: M1 = Right drive motor, M2 = Left drive motor
   static constexpr uint8_t kRoboClawAddr_Drive  = 0x80;
-  static constexpr uint8_t kRoboClawAddr_Strafe = 0x81;
+  // 0x81 → RC2: M2 = Linear actuator only (M1/strafe removed)
+  static constexpr uint8_t kRoboClawAddr_Actuator = 0x81;
 
   // RoboClaw low-level API
   uint16_t RoboClawCRC16(const uint8_t* data, int len);
@@ -124,8 +120,6 @@ class Robot : public frc::TimesliceRobot {
   void AdvanceToNextSetpoint();
   void ResetPidState();
 
-  //Boolean to disable strafe in path following routine
-  bool m_enableYControl = false;
 
   //Pose Estimation helpers
   static constexpr units::meter_t kTrackWidth = 0.215_m;  //Real value, from center of the left wheel to center of the right wheel
@@ -178,8 +172,8 @@ class Robot : public frc::TimesliceRobot {
   static constexpr double kServoDwell_s = 1.0;
 
   // Centering sub-states:
-  // 0 = strafe +x until tag found
-  // 1 = center on tag pixel (lateral strafe)
+  // 0 = drive forward until tag found
+  // 1 = center on tag pixel
   // 2 = arm raised, driving -y toward tag (approach to 13cm)
   // 3 = dwell — beacon dropping
   // 4 = done — lower arm, transition to APPROACH
@@ -266,21 +260,15 @@ class Robot : public frc::TimesliceRobot {
   units::second_t m_lastIMUTime{0};
 
   // ── Encoder snapshot used by sweep ─────────────────────────────────────
-  // RoboClaw 0x80 M1 (left drive)  → vertical odometer
-  // RoboClaw 0x81 M1 (strafe motor) → horizontal odometer
-  // Both are signed: positive = forward / right respectively.
+  // RoboClaw 0x80 M1 (left drive) → vertical odometer
+  // Signed: positive = forward.
   int32_t m_vertTicks    = 0;
-  int32_t m_horizTicks   = 0;
   bool    m_encodersValid = false;
 
-  void UpdateEncoders();   // Reads both odometry encoders every periodic tick
+  void UpdateEncoders();   // Reads drive odometry encoder every periodic tick
 
   // ── Vision / AprilTag ───────────────────────────────────────────────────
   AprilTagReader m_aprilTagReader;
-
-  // ── Sweep state machine ─────────────────────────────────────────────────
-  SweepController m_sweep;
-  bool            m_sweepStarted = false;
 
   // ── Tag-approach autonomous phase ───────────────────────────────────────
   // The robot waits for a tag, then drives straight toward it until
@@ -295,7 +283,7 @@ class Robot : public frc::TimesliceRobot {
   static constexpr uint8_t kApproachSpeed = 45;
 
   //lateral correction speed for centering on the tag (0-127)
-  //applied as a strafe blend when the tag is off-center in the camera frame
+  //applied as a steering blend when the tag is off-center in the camera frame
   static constexpr uint8_t kCenterSpeed = 80;
 
 // ── Camera centering constants ────────────────────────────────────────
@@ -323,13 +311,11 @@ class Robot : public frc::TimesliceRobot {
  
   // ── NetworkTables publishers ─────────────────────────────────────────────
   // Vision/task_done   → Pi reads this to know the robot has arrived.
-  // Vision/sweep_done  → Legacy sweep-completion signal (kept for compatibility).
   nt::BooleanPublisher m_taskDonePub;
-  nt::BooleanPublisher m_sweepDonePub;
 
   // ── Linear actuator (RoboClaw 0x81, M2) ─────────────────────────────────
   // Electrical confirmed: plugged into the M2 terminals on the same controller
-  // as the strafe motor (M1). Extend pushes the ore deposit plate forward.
+  // on 0x81 M2. Extend pushes the ore deposit plate forward.
   void ActuatorExtend (uint8_t speed);
   void ActuatorRetract(uint8_t speed);
   void ActuatorStop   ();
