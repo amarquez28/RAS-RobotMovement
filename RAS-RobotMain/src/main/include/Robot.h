@@ -162,10 +162,6 @@ class Robot : public frc::TimesliceRobot {
   // ── REV ServoHub ────────────────────────────────────────────────────────
   static constexpr int kServoHubId = 20;
   rev::servohub::ServoHub m_servoHub{kServoHubId};
-
-  rev::servohub::ServoChannel& m_servoBrush{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId0)};//brush
-  rev::servohub::ServoChannel &m_servoRelease{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId4)};//release orbs door
-  rev::servohub::ServoChannel &m_servoHall{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId2)};//hall sensor
   rev::servohub::ServoChannel &m_servoArm{m_servoHub.GetServoChannel(rev::servohub::ServoChannel::ChannelId::kChannelId5)};//arm
 
   units::second_t m_servoCommandTime{-1_s};
@@ -231,14 +227,8 @@ class Robot : public frc::TimesliceRobot {
   double m_waypointStartTime_s = 0.0;  // m_timer snapshot when current waypoint began
 
   // Servo pulse widths (microseconds)
-  static constexpr int kHallServoInitPos    = 500;   // Closed
-  static constexpr int kHallServoOpenPos    = 1500;  // Open
-  static constexpr int BrushServoInitPos    = 500;
-  static constexpr int BrushServoOpenPos    = 1500;
-  static constexpr int ArmServoInitPos      = 1240;
-  static constexpr int ArmServoOpenPos      = 1900;
-  static constexpr int ReleaseServoInitPos  = 500;
-  static constexpr int ReleaseServoOpenPos  = 1500;
+  static constexpr int ArmServoInitPos      = 700;
+  static constexpr int ArmServoOpenPos      = 1200;
   bool m_armRaised = false;
   bool m_armDropped = false;
 
