@@ -15,6 +15,19 @@
 /**
  * Structure to hold AprilTag detection data
  */
+/**
+ * Field-relative robot pose computed from AprilTag detection.
+ * Coordinates use the field coordinate system (origin at bottom-right,
+ * +x toward cave, +y toward left wall, +theta CCW).
+ */
+struct FieldPose {
+    double x;           // Robot X position on field (metres)
+    double y;           // Robot Y position on field (metres)
+    double theta;       // Robot heading (radians, 0 = +x, CCW positive)
+    int64_t timestamp_us; // Capture timestamp in FPGA time (microseconds)
+    bool valid;         // True if a known tag was used to compute this pose
+};
+
 struct AprilTagData {
     int id;
     double x;          // Tag center pixel X
@@ -67,6 +80,11 @@ public:
         m_tagsPoseTySub = m_visionTable->GetDoubleArrayTopic("tags_pose_ty").Subscribe({});
         m_tagsPoseTzSub = m_visionTable->GetDoubleArrayTopic("tags_pose_tz").Subscribe({});
 
+        // Field-relative robot pose (computed by Pi from known tag positions)
+        m_robotFieldXSub     = m_visionTable->GetDoubleTopic("robot_field_x").Subscribe(0.0);
+        m_robotFieldYSub     = m_visionTable->GetDoubleTopic("robot_field_y").Subscribe(0.0);
+        m_robotFieldThetaSub = m_visionTable->GetDoubleTopic("robot_field_theta").Subscribe(0.0);
+
         // Heartbeat for connection monitoring
         m_heartbeatSub = m_visionTable->GetIntegerTopic("heartbeat").Subscribe(0);
         m_lastHeartbeat = 0;
@@ -118,7 +136,22 @@ public:
         data.timestamp_us = m_tagTimestampSub.Get();
         return data;
     }
-    
+
+    /**
+     * Get the field-relative robot pose computed by the Pi from AprilTag detection.
+     * Uses known tag positions + full pose rotation to compute (x, y, theta).
+     * @return FieldPose with robot position and heading in field coordinates
+     */
+    FieldPose GetFieldPose() {
+        FieldPose pose;
+        pose.x = m_robotFieldXSub.Get();
+        pose.y = m_robotFieldYSub.Get();
+        pose.theta = m_robotFieldThetaSub.Get();
+        pose.timestamp_us = m_tagTimestampSub.Get();
+        pose.valid = m_tagDetectedSub.Get();
+        return pose;
+    }
+
     /**
      * Get data for all detected tags
      * @return vector of AprilTagData structures
@@ -242,6 +275,11 @@ private:
     nt::DoubleArraySubscriber m_tagsPoseTxSub;
     nt::DoubleArraySubscriber m_tagsPoseTySub;
     nt::DoubleArraySubscriber m_tagsPoseTzSub;
+
+    // Field-relative robot pose subscribers
+    nt::DoubleSubscriber m_robotFieldXSub;
+    nt::DoubleSubscriber m_robotFieldYSub;
+    nt::DoubleSubscriber m_robotFieldThetaSub;
 
     // Connection monitoring
     nt::IntegerSubscriber m_heartbeatSub;
