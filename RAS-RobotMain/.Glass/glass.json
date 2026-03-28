@@ -3,9 +3,6 @@
     "Persistent Values": {
       "open": false
     },
-    "Retained Values": {
-      "open": false
-    },
     "retained": {
       "SmartDashboard": {
         "Auto Modes": {
@@ -15,6 +12,9 @@
       }
     },
     "transitory": {
+      "LiveWindow": {
+        "open": true
+      },
       "SmartDashboard": {
         "IMU": {
           "open": true
@@ -32,11 +32,16 @@
           "open": true
         },
         "open": true
+      },
+      "Vision": {
+        "open": true
       }
     },
     "types": {
       "/FMSInfo": "FMSInfo",
-      "/SmartDashboard/Auto Modes": "String Chooser"
+      "/SmartDashboard/Auto Mode": "String Chooser",
+      "/SmartDashboard/Auto Modes": "String Chooser",
+      "/SmartDashboard/Drivetrain": "Subsystem"
     }
   },
   "NetworkTables Info": {

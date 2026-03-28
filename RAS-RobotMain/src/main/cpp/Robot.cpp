@@ -627,7 +627,7 @@ void Robot::AutonomousPeriodic() {
     frc::SmartDashboard::PutNumber("Pose/X_m", x_pos);
     frc::SmartDashboard::PutNumber("Pose/Y_m", y_pos);
     frc::SmartDashboard::PutNumber("Pose/Theta_rad", theta_pos);
-    frc::SmartDashboard::PutNumber("Pose/Theta_rad IMU", m_thetaRad);
+    frc::SmartDashboard::PutNumber("IMU/Theta_rad IMU", m_thetaRad);
 
     // optional: keep raw strafe encoder visible for debugging
     frc::SmartDashboard::PutNumber("Pose/RawStrafeY_m", rawStrafeY_m);
