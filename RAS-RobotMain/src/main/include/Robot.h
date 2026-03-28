@@ -176,6 +176,17 @@ class Robot : public frc::TimesliceRobot {
   units::second_t m_servoCommandTime{-1_s};
   static constexpr double kServoDwell_s = 1.0;
 
+  // Centering sub-states:
+  // 0 = strafe +x until tag found
+  // 1 = center on tag pixel (lateral strafe)
+  // 2 = arm raised, driving -y toward tag (approach to 13cm)
+  // 3 = dwell — beacon dropping
+  // 4 = done — lower arm, transition to APPROACH
+  int m_centerStep = 0;
+  double m_centerDwellStart_s = 0.0;
+  static constexpr double kBeaconApproachDist_m = 0.13;  // stop 13cm from tag
+  static constexpr double kBeaconDwell_s = 1.5;          // time to drop beacon
+
   // PID Tuning gains
   double x_kP = 130.0;
   double x_kI = 18.0;
