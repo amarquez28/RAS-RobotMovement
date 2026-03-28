@@ -532,6 +532,8 @@ void Robot::AutonomousInit() {
     // Close hatch door
     // m_servoHall.SetPulseWidth(kHallServoInitPos);
 
+    //JUST IN CASE, DELETE IF SOMETHIN HAPPENS
+    ResetPoseEstimator(m_initialPose_BACKUP, 0_m, 0_m, gyroAngle);
     // Raise arm immediately so beacon clears the arena during early turns
     m_armRaised = false;
     m_armDropped = false;
@@ -541,6 +543,7 @@ void Robot::AutonomousInit() {
     RoboClawStopAll();
     RoboClawDrain();
     std::cout << "[Auto] AutonomousInit complete\n";
+    
 }
 
 // ============================================================================
