@@ -133,7 +133,7 @@ class Robot : public frc::TimesliceRobot {
 
   //Pose initial point, first setpoint
   frc::Pose2d m_initialPose{0.78_m, 0.48_m, frc::Rotation2d{0_rad}}; //change values, wait for Justice
-  frc::Pose2d m_initialPose_BACKUP{0.81_m, 0.16_m, frc::Rotation2d{0_rad}};
+  frc::Pose2d m_initialPose_BACKUP{0.81_m, 0.16_m, frc::Rotation2d{units::radian_t{-std::numbers::pi / 2.0}}};
 
   //Estimator declaration
   frc::DifferentialDrivePoseEstimator field_poseEstimator{
