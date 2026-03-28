@@ -939,7 +939,7 @@ void Robot::AutonomousPeriodic() {
             // so the single strafe wheel can actually move the robot laterally
             {
                 int pulse = static_cast<int>(m_timer.Get().value() * 10) % 2; // toggle ~5Hz
-                int8_t jog = pulse ? static_cast<int8_t>(20) : static_cast<int8_t>(-20);
+                int8_t jog = pulse ? static_cast<int8_t>(45) : static_cast<int8_t>(-45);
                 DriveVertical(jog);
             }
             DriveHorizontal(static_cast<int8_t>(kCenterSpeed));
