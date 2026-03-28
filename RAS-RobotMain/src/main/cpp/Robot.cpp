@@ -1099,9 +1099,9 @@ void Robot::AutonomousPeriodic() {
 
             // Gain scheduling for theta: larger P when heading error is large
             double abs_theta = std::abs(theta_error);
-            double sched_kP  = 25.0;
+            double sched_kP  = 20.0;
             if (abs_theta > std::numbers::pi / 4)
-                sched_kP = 80.0;
+                sched_kP = 60.0;
             else if (abs_theta > std::numbers::pi / 12)
                 sched_kP = 40.0;
 
@@ -1186,8 +1186,8 @@ void Robot::AutonomousPeriodic() {
                 // WP 28: Lift arm after grab
                 // WP 42: Open arm
                 // WP 52: Open arm (finish deposit)
-                if (wp == 2 || wp == 22 || wp == 25 || wp == 28 ||
-                    wp == 42 || wp == 52) {
+                if (wp == 8 || wp == 30 || wp == 31 || wp == 34 ||
+                    wp == 48 || wp == 58) {
                     if (m_servoCommandTime.value() < 0) {
                         ArmRaise();
                         m_servoCommandTime = units::second_t(now_s);
@@ -1204,8 +1204,8 @@ void Robot::AutonomousPeriodic() {
                 // WP 27: Lower arm to grab
                 // WP 45: Drop arm
                 // WP 53: Close arm (cave entrance)
-                if (wp == 4 || wp == 24 || wp == 27 ||
-                    wp == 45 || wp == 53) {
+                if (wp == 10 || wp == 30 || wp == 33 ||
+                    wp == 51 || wp == 59) {
                     if (m_servoCommandTime.value() < 0) {
                         ArmLower();
                         m_servoCommandTime = units::second_t(now_s);

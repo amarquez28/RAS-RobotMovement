@@ -82,8 +82,13 @@ static std::vector<Setpoint> Path_Default() {
     return {
 
         // [0] Placeholder — robot holds cave entrance position
-        {0.81, 0.16, 0.0},      // 0 Origin
-        {0.50, 0.40, 3*pi_4},      // 1 Reverse 40 cm
+        {0.81, 0.16, -pi_2},      // 0 Origin
+        {0.81, 0.30, 0.0},
+        {0.81, 0.30, pi_2},    // 1 Reverse 40 cm
+        {0.81, 0.65, pi_2},
+        {0.81,0.57, pi_2},
+        
+
         {0.32, 0.62, 0.0},      // 2 Pickup arm
         {0.19, 0.62, 0.0},      // 3 Reverse 21 cm
         {0.29, 0.62, 0.0},      // 4 Drop arm

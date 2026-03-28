@@ -190,13 +190,13 @@ class Robot : public frc::TimesliceRobot {
 
   bool firstloop;
   // PID Tuning gains
-  double x_kP = 130.0;
-  double x_kI = 18.0;
+  double x_kP = 140.0;
+  double x_kI = 25.0;
   double x_kD = 0.5;
-  double y_kP = 300.0;
-  double y_kI = 55.0;
-  double y_kD = 0.01;
-  double y_to_theta_kP = 10.0;
+  double y_kP = 0.0;
+  double y_kI = 0.0;
+  double y_kD = 0.00;
+  double y_to_theta_kP = 3.0;
   double theta_kI = 5.0;
   double theta_kD = 0.3;
   // Forward/Backward wheel PID state
