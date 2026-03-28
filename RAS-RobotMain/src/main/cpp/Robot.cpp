@@ -499,7 +499,6 @@ void Robot::AutonomousInit() {
     // Reset again so heading starts at zero after calibration
     ResetIMUState();
     frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
-    ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
 
     // m_thetaRad is already zeroed above; reset the PID first-loop flag
     m_firstPidLoop = true;
@@ -673,7 +672,7 @@ void Robot::AutonomousPeriodic() {
         visionTimestampOk = (visionLatencyMs >= 0.0 && visionLatencyMs < 250.0);
         }
 
-    if (visionPoseValid && visionPoseNew && visionTimestampOk) { {
+    if (visionPoseValid && visionPoseNew && visionTimestampOk) {
         double dxVision = visionX - x_pos;
         double dyVision = visionY - y_pos;
         double posErrVision = std::hypot(dxVision, dyVision);
@@ -689,9 +688,6 @@ void Robot::AutonomousPeriodic() {
 
         auto visionStdDevs = GetVisionStdDevsFromConfidence(visionConf);
 
-        bool visionTimestampOk = false;
-        double visionLatencyMs = -1.0;
-
         field_poseEstimator.AddVisionMeasurement(
             visionPose,
             units::second_t{static_cast<double>(visionTsUs) / 1e6},
@@ -705,8 +701,8 @@ void Robot::AutonomousPeriodic() {
         x_pos = estPose.X().value();
         y_pos = estPose.Y().value();
         theta_pos = estPose.Rotation().Radians().value();
+        }
     }
-    
 
 
     // ── 8. State machine ──────────────────────────────────────────────────
@@ -958,20 +954,42 @@ void Robot::AutonomousPeriodic() {
             frc::SmartDashboard::PutNumber("Auto/CenterError_px", pixelError);
 
             if (std::abs(pixelError) <= kCenterTolerance_px)
-            {
-                // Centered — lock lateral position, reset all odometry, start path
-                StopAllDrive();
-                RoboClawResetAllEncoders();
-                m_thetaRad = 0.0;
-                m_yaw_rad = 0.0;
-                m_firstPidLoop = true;
-                ResetPidState();
-                frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
-                ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
-                m_waypointStartTime_s = m_timer.Get().value();
-                m_autoPhase = AutoPhase::APPROACH;
-                std::cout << "[Auto] Centered (error=" << pixelError << "px) — starting path\n";
-            }
+{
+    StopAllDrive();
+    RoboClawResetAllEncoders();
+
+    m_firstPidLoop = true;
+    ResetPidState();
+
+    if (fieldPose.valid) {
+        m_thetaRad = fieldPose.theta;
+        m_yaw_rad = fieldPose.theta;
+
+        frc::Pose2d visionStartPose{
+            units::meter_t{fieldPose.x},
+            units::meter_t{fieldPose.y},
+            frc::Rotation2d{units::radian_t{fieldPose.theta}}
+        };
+
+        frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
+        ResetPoseEstimator(visionStartPose, 0_m, 0_m, gyroAngle);
+
+        std::cout << "[Auto] Centered (error=" << pixelError
+                  << "px) — starting path from VISION pose\n";
+    } else {
+        m_thetaRad = 0.0;
+        m_yaw_rad = 0.0;
+
+        frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
+        ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
+
+        std::cout << "[Auto] Centered (error=" << pixelError
+                  << "px) — vision invalid, starting from INITIAL pose\n";
+    }
+
+    m_waypointStartTime_s = m_timer.Get().value();
+    m_autoPhase = AutoPhase::APPROACH;
+}
             else
             {
                 // Strafe toward tag center.
