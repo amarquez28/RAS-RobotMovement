@@ -45,7 +45,8 @@ enum class AutoPhase{
     SEARCH,
     APPROACH,
     TAG_SEARCH,
-    DONE
+    DONE,
+    TEST
 };
 
 class Robot : public frc::TimesliceRobot {
@@ -211,8 +212,9 @@ class Robot : public frc::TimesliceRobot {
   // to select the cave sub-path. Update this when Path_Default changes.
   static constexpr size_t kTagHandoffWaypoint = 10;
 
-  // How long to search for a tag before giving up and going to DONE.
-  static constexpr double kTagSearchTimeout_s = 30.0; 
+  // How long (seconds) to spend on one waypoint before skipping to the next.
+  static constexpr double kWaypointTimeout_s = 8.0;
+  double m_waypointStartTime_s = 0.0;  // m_timer snapshot when current waypoint began
 
   // Servo pulse widths (microseconds)
   static constexpr int kHallServoInitPos    = 500;   // Closed
