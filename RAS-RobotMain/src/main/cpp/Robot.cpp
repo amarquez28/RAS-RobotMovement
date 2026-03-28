@@ -507,7 +507,7 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine — start by centering on the AprilTag
-    m_autoPhase = AutoPhase::TEST;
+    m_autoPhase = AutoPhase::CENTERING;
     m_taskDone  = false;
 
     // Reset test sequencer
