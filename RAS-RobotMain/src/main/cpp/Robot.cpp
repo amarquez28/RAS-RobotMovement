@@ -496,7 +496,7 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine — start by centering on the AprilTag
-    m_autoPhase = AutoPhase::APPROACH;
+    m_autoPhase = AutoPhase::TEST;
     m_taskDone  = false;
 
     // Reset test sequencer
@@ -639,6 +639,91 @@ void Robot::AutonomousPeriodic() {
     // ── 7. State machine ──────────────────────────────────────────────────
     switch (m_autoPhase)
     {
+    case AutoPhase::TEST:
+    {
+        StopAllDrive();
+        frc::SmartDashboard::PutString("Auto/Phase", "TEST");
+
+        // ── Connection / heartbeat ───────────────────────────────────────
+        bool visionConnected = m_aprilTagReader.IsConnected();
+        frc::SmartDashboard::PutBoolean("Test/Vision Connected", visionConnected);
+        frc::SmartDashboard::PutBoolean("Test/Has Target", hasTag);
+        frc::SmartDashboard::PutNumber("Test/Tag Count", m_aprilTagReader.GetTagCount());
+
+        // ── Primary tag raw data ─────────────────────────────────────────
+        if (hasTag) {
+            frc::SmartDashboard::PutNumber("Test/Primary ID", tag.id);
+            frc::SmartDashboard::PutNumber("Test/Primary Pixel X", tag.x);
+            frc::SmartDashboard::PutNumber("Test/Primary Pixel Y", tag.y);
+            frc::SmartDashboard::PutNumber("Test/Primary Distance (m)", tag.distance);
+
+            // Camera-relative pose (tilt-corrected by Pi)
+            frc::SmartDashboard::PutNumber("Test/Pose TX (m)", tag.pose_tx);
+            frc::SmartDashboard::PutNumber("Test/Pose TY (m)", tag.pose_ty);
+            frc::SmartDashboard::PutNumber("Test/Pose TZ (m)", tag.pose_tz);
+
+            // Detection quality
+            frc::SmartDashboard::PutNumber("Test/Pose Error", tag.pose_err);
+            frc::SmartDashboard::PutNumber("Test/Decision Margin", tag.decision_margin);
+
+            // Capture timestamp (FPGA µs, -1 if not synced)
+            frc::SmartDashboard::PutNumber("Test/Timestamp us", static_cast<double>(tag.timestamp_us));
+        } else {
+            frc::SmartDashboard::PutNumber("Test/Primary ID", -1);
+            frc::SmartDashboard::PutNumber("Test/Primary Distance (m)", -1.0);
+        }
+
+        // ── Field-relative robot pose (computed by Pi) ───────────────────
+        FieldPose fieldPose = m_aprilTagReader.GetFieldPose();
+        frc::SmartDashboard::PutBoolean("Test/Field Pose Valid", fieldPose.valid);
+        frc::SmartDashboard::PutNumber("Test/Field X (m)", fieldPose.x);
+        frc::SmartDashboard::PutNumber("Test/Field Y (m)", fieldPose.y);
+        frc::SmartDashboard::PutNumber("Test/Field Theta (rad)", fieldPose.theta);
+        frc::SmartDashboard::PutNumber("Test/Field Theta (deg)", fieldPose.theta * 180.0 / std::numbers::pi);
+
+        // ── Encoder odometry vs vision comparison ────────────────────────
+        // These are already computed above as x_pos, y_pos, theta_pos
+        frc::SmartDashboard::PutNumber("Test/Odom X (m)", x_pos);
+        frc::SmartDashboard::PutNumber("Test/Odom Y (m)", y_pos);
+        frc::SmartDashboard::PutNumber("Test/Odom Theta (rad)", theta_pos);
+
+        // Difference: vision field pose minus encoder odometry
+        if (fieldPose.valid) {
+            frc::SmartDashboard::PutNumber("Test/Delta X (m)", fieldPose.x - x_pos);
+            frc::SmartDashboard::PutNumber("Test/Delta Y (m)", fieldPose.y - y_pos);
+            frc::SmartDashboard::PutNumber("Test/Delta Theta (rad)", fieldPose.theta - theta_pos);
+        }
+
+        // ── IMU heading ──────────────────────────────────────────────────
+        frc::SmartDashboard::PutNumber("Test/IMU Theta (rad)", m_thetaRad);
+        frc::SmartDashboard::PutNumber("Test/IMU Theta (deg)", m_thetaRad * 180.0 / std::numbers::pi);
+
+        // ── All visible tags ─────────────────────────────────────────────
+        auto allTags = m_aprilTagReader.GetAllTags();
+        std::string tagList = "";
+        for (size_t i = 0; i < allTags.size(); i++) {
+            const auto& t = allTags[i];
+            std::string prefix = "Test/Tag[" + std::to_string(i) + "]/";
+            frc::SmartDashboard::PutNumber(prefix + "ID", t.id);
+            frc::SmartDashboard::PutNumber(prefix + "Distance (m)", t.distance);
+            frc::SmartDashboard::PutNumber(prefix + "Pose TX (m)", t.pose_tx);
+            frc::SmartDashboard::PutNumber(prefix + "Pose TY (m)", t.pose_ty);
+            frc::SmartDashboard::PutNumber(prefix + "Pose TZ (m)", t.pose_tz);
+            if (i > 0) tagList += ", ";
+            tagList += std::to_string(t.id);
+        }
+        frc::SmartDashboard::PutString("Test/Visible Tags", tagList);
+
+        // ── Latency estimate ─────────────────────────────────────────────
+        if (hasTag && tag.timestamp_us > 0) {
+            auto fpgaNow = frc::Timer::GetFPGATimestamp();
+            int64_t fpgaNow_us = static_cast<int64_t>(fpgaNow.value() * 1e6);
+            double latency_ms = (fpgaNow_us - tag.timestamp_us) / 1000.0;
+            frc::SmartDashboard::PutNumber("Test/Vision Latency (ms)", latency_ms);
+        }
+
+        break;
+    }
     // ── DONE: hold position ───────────────────────────────────────────────
     case AutoPhase::DONE:
         StopAllDrive();

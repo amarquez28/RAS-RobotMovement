@@ -45,7 +45,8 @@ enum class AutoPhase{
     SEARCH,
     APPROACH,
     TAG_SEARCH,
-    DONE
+    DONE,
+    TEST
 };
 
 class Robot : public frc::TimesliceRobot {
