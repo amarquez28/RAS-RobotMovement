@@ -24,6 +24,14 @@
 #include <vector>
 #include <AutonomousPaths.h>
 
+//Pose estimation required libraries
+#include <frc/geometry/Pose2d.h>
+#include <frc/geometry/Rotation2d.h>
+#include <frc/kinematics/DifferentialDriveKinematics.h>
+#include <frc/estimator/DifferentialDrivePoseEstimator.h>
+#include <units/length.h>
+#include <units/angle.h>
+
 // ── Autonomous phase ─────────────────────────────────────────────────────────
 // CENTERING : Strafe until the AprilTag is centered in the camera frame.
 //             Resets encoders + IMU when done, then transitions to APPROACH.
@@ -80,7 +88,7 @@ class Robot : public frc::TimesliceRobot {
   frc::SerialPort m_roboclaw{38400, frc::SerialPort::Port::kMXP};
 
   // RoboClaw addresses
-  // 0x80 → RC1: M1 = Left drive motor,  M2 = Right drive motor  (vertical)
+  // 0x80 → RC1: M1 = Right drive motor, M2 = Left drive motor (vertical)  
   // 0x81 → RC2: M1 = Strafe motor                               (horizontal)
   static constexpr uint8_t kRoboClawAddr_Drive  = 0x80;
   static constexpr uint8_t kRoboClawAddr_Strafe = 0x81;
@@ -108,12 +116,43 @@ class Robot : public frc::TimesliceRobot {
   //Wrap Angle for Theta controller
   double WrapAngle(double angle);
   //IMU Calibration before starting the program
+  void ResetIMUState();
   void CalibrateGyroZBias();
-  void UpdateIMUTheta();
   //Setpoint Helpers
   void LoadAutonomousSetpoints();
   void AdvanceToNextSetpoint();
   void ResetPidState();
+
+  //Boolean to disable strafe in path following routine
+  bool m_enableYControl = false;
+
+  //Pose Estimation helpers
+  static constexpr units::meter_t kTrackWidth = 0.215_m;  //Real value, from center of the left wheel to center of the right wheel
+  frc::DifferentialDriveKinematics m_driveKinematics{kTrackWidth};
+
+  //Pose initial point, first setpoint
+  frc::Pose2d m_initialPose{0.79_m, 0.4_m, frc::Rotation2d{0_rad}}; //change values, wait for Justice
+
+  //Estimator declaration
+  frc::DifferentialDrivePoseEstimator field_poseEstimator{
+    m_driveKinematics,
+    frc::Rotation2d{0_rad},
+    0_m, //Left Wheel
+    0_m, //Right Wheel
+    frc::Pose2d{}
+  };
+
+  // Pose estimator helpers
+  void ResetPoseEstimator(const frc::Pose2d& pose,
+                          units::meter_t leftDist,
+                          units::meter_t rightDist,
+                          frc::Rotation2d gyroAngle);
+
+  frc::Pose2d UpdatePoseEstimator(units::second_t timestamp,
+                                  units::meter_t leftDist,
+                                  units::meter_t rightDist,
+                                  frc::Rotation2d gyroAngle);
+
 
   // ── Hall sensor ─────────────────────────────────────────────────────────
   frc::AnalogInput  m_hallAnalog{0};   // AI0
@@ -132,12 +171,13 @@ class Robot : public frc::TimesliceRobot {
   static constexpr double kServoDwell_s = 1.0;
 
   // PID Tuning gains
-  double x_kP = 95.0;
+  double x_kP = 105.0;
   double x_kI = 19.0;
   double x_kD = 0.8;
   double y_kP = 300.0;
   double y_kI = 55.0;
   double y_kD = 0.01;
+  double y_to_theta_kP = 1.2;
   double theta_kI = 5.0;
   double theta_kD = 0.3;
   // Forward/Backward wheel PID state

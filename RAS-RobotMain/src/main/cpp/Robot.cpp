@@ -30,6 +30,8 @@
 #include <algorithm>
 #include <iostream>
 #include <numbers>
+#include <units/angle.h>
+#include <units/length.h>
 
 // ── File-scope IMU helper ────────────────────────────────────────────────────
 // Convert two big-endian bytes to a signed 16-bit integer.
@@ -277,9 +279,14 @@ bool Robot::IMUReadRegs(uint8_t startReg, uint8_t* out, int len) {
 }
 
 void Robot::IMUInit() {
-    IMUWriteReg(0x6B, 0x00); // PWR_MGMT_1: wake up
-    IMUWriteReg(0x1B, 0x00); // GYRO_CONFIG: ±250 dps full scale
-    IMUWriteReg(0x1C, 0x00); // ACCEL_CONFIG: ±2 g full scale
+    IMUWriteReg(0x6B, 0x00); // wake
+    IMUWriteReg(0x1B, 0x00); // gyro ±250 dps
+    IMUWriteReg(0x1C, 0x00); // accel ±2g
+}
+void Robot::ResetIMUState() {
+    m_thetaRad = 0.0;
+    m_yaw_rad = 0.0;
+    m_lastGyroZ_radps = 0.0;
     m_lastIMUTime = frc::Timer::GetFPGATimestamp();
 }
 
@@ -314,30 +321,6 @@ void Robot::IMUUpdate() {
     // Bias-corrected heading used by PID
     m_thetaRad += (avg_radps - m_gyroZBiasRadps) * dt;
     m_thetaRad  = WrapAngle(m_thetaRad);
-}
-
-// IMUDashboard() – push all raw and converted IMU data to SmartDashboard
-void Robot::IMUDashboard() {
-    uint8_t data[14] = {0};
-    bool err = IMUReadRegs(0x3B, data, 14);
-    frc::SmartDashboard::PutBoolean("IMU/ReadError", err);
-    if (err) return;
-
-    int16_t ax = ToInt16(data[0],  data[1]);
-    int16_t ay = ToInt16(data[2],  data[3]);
-    int16_t az = ToInt16(data[4],  data[5]);
-    int16_t gx = ToInt16(data[8],  data[9]);
-    int16_t gy = ToInt16(data[10], data[11]);
-    int16_t gz = ToInt16(data[12], data[13]);
-
-    frc::SmartDashboard::PutNumber("IMU/Accel_g_X",    ax / 16384.0);
-    frc::SmartDashboard::PutNumber("IMU/Accel_g_Y",    ay / 16384.0);
-    frc::SmartDashboard::PutNumber("IMU/Accel_g_Z",    az / 16384.0);
-    frc::SmartDashboard::PutNumber("IMU/Gyro_radps_X", (gx / 131.0) * (std::numbers::pi / 180.0));
-    frc::SmartDashboard::PutNumber("IMU/Gyro_radps_Y", (gy / 131.0) * (std::numbers::pi / 180.0));
-    frc::SmartDashboard::PutNumber("IMU/Gyro_radps_Z", (gz / 131.0) * (std::numbers::pi / 180.0));
-    frc::SmartDashboard::PutNumber("IMU/Yaw_rad",      m_yaw_rad);
-    frc::SmartDashboard::PutNumber("IMU/Theta_rad",    m_thetaRad);
 }
 
 // ============================================================================
@@ -398,7 +381,7 @@ double Robot::WrapAngle(double angle) {
 }
 
 void Robot::LoadAutonomousSetpoints() {
-    int tag_id = 0;
+    int tag_id = 1;
     // int tag_id = m_aprilTagReader.GetPrimaryTag().id;
     m_setpoints = AutonomousPaths::GetPath(tag_id);
     m_currentSetpointIndex = 0;
@@ -428,15 +411,41 @@ void Robot::ResetPidState() {
     theta_deriv = 0.0;
 }
 
+//Reset pose estimator, this is going to help fix a position in the field and push actual pose to that position 
+void Robot::ResetPoseEstimator(const frc::Pose2d& pose,
+                               units::meter_t leftDist,
+                               units::meter_t rightDist,
+                               frc::Rotation2d gyroAngle) {
+    field_poseEstimator.ResetPosition(
+        gyroAngle,
+        leftDist,
+        rightDist,
+        pose
+    );
+}
+
+//Update every cycle the pose estimator with time values, IMU and encoder readings
+frc::Pose2d Robot::UpdatePoseEstimator(units::second_t timestamp,
+                                       units::meter_t leftDist,
+                                       units::meter_t rightDist,
+                                       frc::Rotation2d gyroAngle) {
+    return field_poseEstimator.UpdateWithTime(
+        timestamp,
+        gyroAngle,
+        leftDist,
+        rightDist
+    );
+}
+
 // ============================================================================
 //  RobotPeriodic  – runs every packet regardless of mode
 // ============================================================================
 
 void Robot::RobotPeriodic() {
-    // Single IMU I2C read per tick – updates m_thetaRad and m_yaw_rad
+    // Single IMU read / integration source for all modes
     IMUUpdate();
 
-    // AprilTag dashboard (vision system health + tag data)
+    // Vision dashboard
     m_aprilTagReader.UpdateDashboard();
 
     // Hall sensor → hatch door servo
@@ -446,13 +455,15 @@ void Robot::RobotPeriodic() {
     //     m_servoHall.SetPulseWidth(kHallServoInitPos);
     // }
 
-    // Dashboard: hall sensor
-    frc::SmartDashboard::PutNumber ("Hall/Voltage_V", m_hallAnalog.GetVoltage());
-    frc::SmartDashboard::PutNumber ("Hall/Raw",       m_hallAnalog.GetValue());
-    frc::SmartDashboard::PutBoolean("Hall/Digital",   m_hallDigital.Get());
+    // Hall sensor dashboard
+    frc::SmartDashboard::PutNumber("Hall/Voltage_V", m_hallAnalog.GetVoltage());
+    frc::SmartDashboard::PutNumber("Hall/Raw",       m_hallAnalog.GetValue());
+    frc::SmartDashboard::PutBoolean("Hall/Digital",  m_hallDigital.Get());
 
-    // IMU dashboard (non-integrated values for debugging)
-    IMUDashboard();
+    // IMU dashboard using already-integrated state
+    frc::SmartDashboard::PutNumber("IMU/Theta_rad", m_thetaRad);
+    frc::SmartDashboard::PutNumber("IMU/YawRaw_rad", m_yaw_rad);
+    frc::SmartDashboard::PutNumber("IMU/GyroZBias_radps", m_gyroZBiasRadps);
 }
 
 // ============================================================================
@@ -466,17 +477,17 @@ void Robot::AutonomousInit() {
     // Reset all encoders to zero so dead-reckoning is relative to start pos
     RoboClawResetAllEncoders();
 
-    // Re-init IMU in case of a power cycle between runs
+    // Reconfigure IMU and reset software-integrated heading state
     IMUInit();
+    ResetIMUState();
 
-    // Zero all yaw integrators – must happen before CalibrateGyroZBias
-    m_yaw_rad          = 0.0;
-    m_thetaRad         = 0.0;
-    m_lastGyroZ_radps  = 0.0;
-    m_lastIMUTime      = frc::Timer::GetFPGATimestamp();
-
-    // Calibrate gyro bias (robot must be stationary for ~1 second)
+    // Calibrate gyro Z bias while robot is stationary
     CalibrateGyroZBias();
+
+    // Reset again so heading starts at zero after calibration
+    ResetIMUState();
+    frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
+    ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
 
     // m_thetaRad is already zeroed above; reset the PID first-loop flag
     m_firstPidLoop = true;
@@ -485,7 +496,7 @@ void Robot::AutonomousInit() {
     LoadAutonomousSetpoints();
 
     // Reset approach state machine — start by centering on the AprilTag
-    m_autoPhase = AutoPhase::CENTERING;
+    m_autoPhase = AutoPhase::APPROACH;
     m_taskDone  = false;
 
     // Reset test sequencer
@@ -517,7 +528,6 @@ void Robot::AutonomousInit() {
     // Safety stop
     RoboClawStopAll();
     RoboClawDrain();
-
     std::cout << "[Auto] AutonomousInit complete\n";
 }
 
@@ -556,7 +566,8 @@ void Robot::AutonomousPeriodic() {
     // IsConnected() must be called every tick (it compares heartbeat counters).
     bool visionConnected = m_aprilTagReader.IsConnected();
     frc::SmartDashboard::PutBoolean("Vision/PiConnected", visionConnected);
-
+    frc::SmartDashboard::PutBoolean("Auto/Alive", true);
+    frc::SmartDashboard::PutNumber("Auto/TestNumber", 5678.0);
     // ── 3. Compute dt for PID ─────────────────────────────────────────────
     units::second_t now = frc::Timer::GetFPGATimestamp();
     double dt = 0.0;
@@ -598,14 +609,24 @@ void Robot::AutonomousPeriodic() {
     if (ok80_2) frc::SmartDashboard::PutNumber("RC1 Encoder2", static_cast<double>(e80_m2));
     if (ok81_1) frc::SmartDashboard::PutNumber("RC2 Encoder1", static_cast<double>(e81_m1));
 
-    double xr_pos = e80_m1 * kXMetPerPul; // right drive wheel
-    double xl_pos = e80_m2 * kXMetPerPul; // left  drive wheel
-    double y_pos  = e81_m1 * kYMetPerPul; // strafe
-    double x_pos  = (xr_pos + xl_pos) / 2.0;
+    units::meter_t xl_pos = units::meter_t{e80_m2 * kXMetPerPul};
+    units::meter_t xr_pos = units::meter_t{e80_m1 * kXMetPerPul};
+    frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
+    double rawStrafeY_m = e81_m1 * kYMetPerPul;
 
-    frc::SmartDashboard::PutNumber("Pose/X_m",     x_pos);
-    frc::SmartDashboard::PutNumber("Pose/Y_m",     y_pos);
-    frc::SmartDashboard::PutNumber("Pose/Theta_rad", m_thetaRad);
+    frc::Pose2d estPose = UpdatePoseEstimator(now, xl_pos, xr_pos, gyroAngle);
+
+    double x_pos = estPose.X().value();
+    double y_pos = estPose.Y().value();
+    double theta_pos = estPose.Rotation().Radians().value();
+
+    frc::SmartDashboard::PutNumber("Pose/X_m", x_pos);
+    frc::SmartDashboard::PutNumber("Pose/Y_m", y_pos);
+    frc::SmartDashboard::PutNumber("Pose/Theta_rad", theta_pos);
+    frc::SmartDashboard::PutNumber("Pose/Theta_rad IMU", m_thetaRad);
+
+    // optional: keep raw strafe encoder visible for debugging
+    frc::SmartDashboard::PutNumber("Pose/RawStrafeY_m", rawStrafeY_m);
 
     // ── 6. Read AprilTag ──────────────────────────────────────────────────
     bool hasTag = m_aprilTagReader.HasTarget();
@@ -658,7 +679,7 @@ void Robot::AutonomousPeriodic() {
             double theta_target = 0.0;
             double x_error     = x_target - x_pos;
             double y_error     = y_target - y_pos;
-            double theta_error = WrapAngle(theta_target - m_thetaRad);
+            double theta_error = WrapAngle(theta_target - theta_pos);
             x_integral     += x_error     * dt;
             y_integral     += y_error     * dt;
             theta_integral += theta_error * dt;
@@ -787,6 +808,8 @@ void Robot::AutonomousPeriodic() {
                 m_yaw_rad = 0.0;
                 m_firstPidLoop = true;
                 ResetPidState();
+                frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
+                ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
                 m_autoPhase = AutoPhase::APPROACH;
                 std::cout << "[Auto] Centered (error=" << pixelError << "px) — starting path\n";
             }
@@ -849,9 +872,18 @@ void Robot::AutonomousPeriodic() {
             //     theta_target = m_thetaRad;
             // }
 
-            double x_error     = x_target - x_pos;
-            double y_error     = y_target - y_pos;
-            double theta_error = WrapAngle(theta_target - m_thetaRad);
+            double dx_field = x_target - x_pos;
+            double dy_field = y_target - y_pos;
+
+            double c = std::cos(theta_pos);
+            double s = std::sin(theta_pos);
+
+            double x_error =  c * dx_field + s * dy_field;   // robot forward/back
+            double y_error = -s * dx_field + c * dy_field;   // robot lateral
+
+            // Outer loop: lateral error creates a heading reference correction
+            double theta_ref = theta_target + y_to_theta_kP * y_error;
+            double theta_error = WrapAngle(theta_ref - theta_pos);
 
             // Integrate
             x_integral     += x_error     * dt;
@@ -880,6 +912,11 @@ void Robot::AutonomousPeriodic() {
             if (std::abs(x_cmd)     > 127.0) { x_integral     -= x_error     * dt; x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv; }
             if (std::abs(y_cmd)     > 127.0) { y_integral     -= y_error     * dt; y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv; }
             if (std::abs(theta_cmd) >  80.0) { theta_integral -= theta_error * dt; theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv; }
+
+            y_cmd = 0.0;   
+            y_integral = 0.0;
+            y_prevError = 0.0;
+            y_deriv = 0.0;
 
             // Save errors for next derivative calculation
             x_prevError     = x_error;
@@ -913,7 +950,7 @@ void Robot::AutonomousPeriodic() {
             }
 
             bool x_done     = (std::abs(x_error)     <= kXTol);
-            bool y_done     = (std::abs(y_error)     <= kYTol);
+            bool y_done = !m_enableYControl || (std::abs(y_error) <= kYTol);
             bool theta_done = (std::abs(theta_error) <= kThetaTol);
 
             if (x_done && y_done && theta_done) {
@@ -997,6 +1034,13 @@ void Robot::AutonomousPeriodic() {
             if (y_cmd > 0.0 && y_cmd < 25.0) y_cmd = 25.0;
             if (y_cmd < 0.0 && y_cmd > -25.0) y_cmd = -25.0;
 
+            if (!m_enableYControl) {
+                y_cmd = 0.0;
+                y_integral = 0.0;
+                y_prevError = 0.0;
+                y_deriv = 0.0;
+            }
+
             // Differential mixing for drive wheels
             double xr_cmd = std::clamp(x_cmd + theta_cmd, -127.0, 127.0);
             double xl_cmd = std::clamp(x_cmd - theta_cmd, -127.0, 127.0);
@@ -1019,10 +1063,7 @@ void Robot::AutonomousPeriodic() {
             else if (xl_cmd < 0.0) RoboClawM2Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdl));
             else                   RoboClawM2Forward  (kRoboClawAddr_Drive, 0);
 
-            // Strafe (M1 on 0x81)
-            if      (y_cmd > 0.0) RoboClawM1Forward (kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
-            else if (y_cmd < 0.0) RoboClawM1Backward(kRoboClawAddr_Strafe, static_cast<uint8_t>(spdy));
-            else                  RoboClawM1Forward  (kRoboClawAddr_Strafe, 0);
+            RoboClawM1Forward(kRoboClawAddr_Strafe, 0);
 
             // PID telemetry
             frc::SmartDashboard::PutNumber("PID/WaypointIndex",
