@@ -136,61 +136,96 @@ static std::vector<Setpoint> Path_1() {
     using namespace PathConst;
     return {
          // [0] Placeholder — robot holds cave entrance position
- {0.78, 0.48, 0.0},      // 0 Origin
-        {0.38, 0.48, 0.0},      // 1 Reverse 40 cm
-        {0.38, 0.48, 0.0},      // 2 Pickup arm
-        {0.17, 0.48, 0.0},      // 3 Reverse 21 cm
-        {0.17, 0.48, 0.0},      // 4 Drop arm
-        {0.17, 0.48, pi_2},     // 5 Turn left 90°
-        {0.17, 0.78, pi_2},     // 6 Forward 30 cm along rotated x→y
-        {0.17, 0.78, 0.0},      // 7 Turn right 90°
-        {0.37, 0.48, 0.0},      // 8 Forward 20 cm
-        {0.37, 0.48, -pi_2},    // 9 Turn right 90°
-        {0.37, -0.22, -pi/2},   // 10 Forward 70 cm
-        {0.37, -0.22, 0.0},     // 11 Turn left 90°
-        {0.57, -0.22, 0.0},     // 12 Forward 20 cm
-        {0.57, -0.22, pi_2},    // 13 Turn left 90°
-        {0.57, 0.29, pi_2},     // 14 Forward 51 cm
-        {0.57, -0.22, pi_2},    // 15 Reverse 51 cm
-        {0.57, -0.22, 0.0},     // 16 Turn right 90°
-        {0.74, -0.22, 0.0},     // 17 Forward 17 cm
-        {0.74, -0.22, pi_2},    // 18 Turn left 90°
-        {0.74, 0.29, pi_2},     // 19 Forward 51 cm
-        {0.74, 0.29, 0.0},      // 20 Turn right 90°
-        {0.74, 0.29, -pi_2},    // 21 Turn right 90°
-        {0.74, 0.29, -pi_2},    // 22 Raise arm
-        {0.74, 0.37, -pi_2},    // 23 Reverse 8 cm
-        {0.74, 0.37, -pi_2},    // 24 Drop arm
-        {0.74, 0.12, -pi_2},    // 25 Forward 25 cm
-        {0.74, 0.12, 0.0},      // 26 Turn left 90°
-        {0.31, 0.12, 0.0},      // 27 Reverse 43 cm
-        {0.31, 0.12, 0.0},      // 28 Lift arm
-        {0.74, 0.12, 0.0},      // 29 Forward 43 cm
-        {0.74, 0.12, -pi_2},    // 30 Turn right 90°
-        {0.74, -0.01, -pi_2},   // 31 Forward 13 cm
-        {0.74, -0.01, 0.0},     // 32 Turn left 90°
-        {0.29, -0.01, 0.0},     // 33 Reverse 45 cm
-        {0.29, -0.01, 0.0},     // 34 Deposit
-        {1.21, -0.01, 0.0},     // 35 Forward 92 cm
-        {0.71, -0.01, 0.0},     // 36 Reverse 50 cm
-        {0.71, -0.01, -pi_2},   // 37 Turn right 90°
-        {0.71, -0.21, -pi_2},   // 38 Forward 20 cm
-        {0.71, -0.21, pi_2},    // 39 Turn left 90°
-        {1.06, -0.21, pi_2},    // 40 Forward 35 cm
-        {0.71, -0.21, pi_2},    // 41 Reverse 35 cm
-        {0.71, -0.21, pi_2},    // 42 Turn left 90°
-        {0.71, 0.19, pi_2},     // 43 Forward 40 cm
-        {0.71, 0.19, -pi_2},    // 44 Turn right 90°
-        {1.23, 0.19, -pi_2},    // 45 Forward 52 cm
-        {0.71, 0.19, -pi_2},    // 46 Reverse 52 cm
-        {0.71, 0.19, pi_2},     // 47 Turn left 90°
-        {0.71, 0.39, pi_2},     // 48 Forward 20 cm
-        {0.71, 0.39, -pi_2},    // 49 Turn right 90°
-        {1.23, 0.39, -pi_2},    // 50 Forward 52 cm
-        {0.71, 0.39, -pi_2},    // 51 Reverse 52 cm
-        {0.71, 0.39, 0.0},      // 52 Turn right 90°
-        {1.11, 0.39, 0.0},      // 53 Forward 40 cm
-        {1.11, 0.39, pi_2},     // 54 Turn left 90°
+        //{0.78, 0.62, 0.0},      // 0 Origin
+        {0.32, 0.62, 0.0},      // 1 Reverse 40 cm
+        {0.32, 0.62, 0.0},      // 2 Pickup arm
+        {0.19, 0.62, 0.0},      // 3 Reverse 21 cm
+        {0.29, 0.62, 0.0},      // 4 Drop arm
+        {0.29, 0.62, pi_2},     // 5 Turn left 90°
+        {0.29, 0.96, pi_2},   //k  // 6 Forward 30 cm along rotated x→y
+        {0.29, 0.96, 0.0}, //k     // 7 Turn right 90°
+        {0.42, 0.96, 0.0},   //k   // 8 Forward 20 cm
+        {0.42, 0.96, -pi_2},  //k  // 9 Turn right 90°
+        {0.42, 0.22, -pi/2}, //k  // 10 Forward 70 cm
+        {0.42, 0.22, 0.0},   //k  // 11 Turn left 90°
+        {0.62, 0.22, 0.0},     // 12 Forward 20 cm
+        {0.62, 0.22, pi_2}, //k   // 13 Turn left 90°
+        {0.62, 0.78, pi_2},   //k  // 14 Forward 51 cm
+        {0.62, 0.22, pi_2},    // 15 Reverse 51 cm
+        {0.62, 0.22, 0.0},     // 16 Turn right 90°
+        {0.79, 0.22, 0.0},     // 17 Forward 17 cm
+        {0.79, 0.22, pi_2},    // 18 Turn left 90°
+        {0.79, 0.76, pi_2},  //k   // 19 Forward 51 cm
+        {0.79, 0.76, 0.0},      // 20 Turn right 90°
+        {0.79, 0.76, -pi_2}, //k   // 21 Turn right 90°
+        {0.79, 0.85, -pi_2},    // 22 Raise arm
+        {0.76, 0.85, -pi_2},  //k  // 23 Reverse 8 cm
+        {0.76, 0.85, -pi_2},  //k  // 24 Drop arm
+        {0.76, 0.59, -pi_2},    // 25 Forward 25 cm
+        {0.76, 0.59, 0.0},   //k   // 26 Turn left 90°
+        {0.30, 0.59, 0.0},      // 27 Reverse 43 cm
+        {0.30, 0.59, 0.0},      // 28 Lift arm
+        {0.76, 0.59, 0.0},   //k   // 29 Forward 43 cm
+        {0.76, 0.59, -pi_2},    // 30 Turn right 90°
+        {0.76, 0.46, -pi_2}, //k  // 31 Forward 13 cm
+        {0.76, 0.46, 0.0}, //k    // 32 Turn left 90°
+        {0.28, 0.37, 0.0},     // 33 Reverse 45 cm
+        {0.29, 0.37, 0.0},     // 34 Deposit
+        {1.12, 0.37, 0.0},     // 35 Forward 92 cm
+        {0.62, 0.37, 0.0},     // 36 Reverse 50 cm
+        {0.62, 0.37, -pi_2},   // 37 Turn right 90°
+        {0.62, 0.2, -pi_2},   // 38 Forward 20 cm
+        {0.62, 0.2, 0},  //k  // 39 Turn left 90°
+        {1.00, 0.2, 0},    // 40 Forward 35 cm
+        {0.90, 0.2, 0},    // 41 Reverse 35 cm //maybe dont reverse here
+        {0.90, 0.2, pi_2}, //k   // 42 Turn left 90°
+        {0.90, 0.92, pi_2},     // 43 Forward 40 cm
+        {0.90, 0.57, pi_2},//k    // 44 Turn right 90°
+        {0.90, 0.57, 0},  //k  // 45 Forward 52 cm
+        {1.08, 0.92, pi_2}, //k   // 46 Reverse 52 cm
+        {1.20, 0.33, pi_2},  //k   // 47 Turn left 90°
+        {1.20, 0.60, pi_2},  //k   // 48 Forward 20 cm
+        {1.20, 0.60, 0},    // 49 Turn right 90°
+        {0.46, 0.54, 0},    // 50 Forward 52 cm
+        {0.66, 0.48, 0}, //Deposit   // 51 Reverse 52 cm
+        {0.46, 0.42, 0.0},    //finish deposit  // 52 Turn right 90°
+        {1.08, 0.59, 0.0},   //Cave Entrance   // 53 Forward 40 cm
+        //Cave
+        {2.20, 0.57, 0},
+        {1.75, 0.57, 0},
+        {1.75, 0.57, pi_2},
+        {1.75, 0.95, pi_2},
+        {1.75, 0.57, pi_2},
+        {1.75, 0.57, 0},
+        {1.94,  0.57, 0},
+        {1.94,  0.57, pi_2},
+        {1.94,  0.95, pi_2},
+        {1.94,  0.57, pi_2},
+        {1.94,  0.57, 0},
+        {2.15, 0.57, 0},
+        {2.15, 0.57, pi_2},
+        {2.15, 0.95, pi_2},
+        {2.15, 0.57, pi_2},
+        {2.15, 0.57, -pi_2},
+        {2.15, 0.57, -pi_2},
+        {2.15, 0.05, -pi_2},
+        {2.15, 0.57, -pi_2},
+        {2.15, 0.57, pi},
+        {1.95,  0.57, pi},
+        {1.95,  0.57, -pi_2},
+        {1.95,  0.05, -pi_2},
+        {1.95,  0.57, -pi_2},
+        {1.95,  0.57, pi},
+        {1.75,  0.57, pi},
+        {1.75,  0.57, -pi_2},
+        {1.75,  0.05, -pi_2},
+        {1.75,  0.57, -pi_2},
+        {1.75,  0.57, pi},
+        {0.95,  0.57, pi},
+        {0.95,  0.57, pi_2},
+        {0.95, 0.57, 0},
+        {0.46,  0.38, 0}, //DEPOSIT
+        /*
         {0.69, 0.39, pi_2},     // 55 Reverse 42 cm
         {1.11, 0.39, pi_2},     // 56 Forward 42 cm
         {1.11, 0.39, pi_2},     // 57 Turn left 90°
@@ -232,7 +267,7 @@ static std::vector<Setpoint> Path_1() {
         {1.46, 0.39, pi},       // 93 Reverse 26 cm
         {1.46, 0.39, pi},       // 94 Deposit
         {2.16, 0.39, pi},       // 95 Forward 70 cm
-        {2.16, 0.39, pi_2},     // 96 Turn left 90°
+        {2.16, 0.39, pi_2},     // 96 Turn left 90° */
     };
 }
 

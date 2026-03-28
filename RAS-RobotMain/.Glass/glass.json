@@ -13,6 +13,15 @@
         "IMU": {
           "open": true
         },
+        "PID": {
+          "open": true
+        },
+        "Pose": {
+          "open": true
+        },
+        "Test": {
+          "open": true
+        },
         "Vision": {
           "open": true
         },

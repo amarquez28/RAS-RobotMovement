@@ -131,7 +131,7 @@ class Robot : public frc::TimesliceRobot {
   frc::DifferentialDriveKinematics m_driveKinematics{kTrackWidth};
 
   //Pose initial point, first setpoint
-  frc::Pose2d m_initialPose{0.79_m, 0.4_m, frc::Rotation2d{0_rad}}; //change values, wait for Justice
+  frc::Pose2d m_initialPose{0.78_m, 0.48_m, frc::Rotation2d{0_rad}}; //change values, wait for Justice
 
   //Estimator declaration
   frc::DifferentialDrivePoseEstimator field_poseEstimator{
@@ -171,13 +171,13 @@ class Robot : public frc::TimesliceRobot {
   static constexpr double kServoDwell_s = 1.0;
 
   // PID Tuning gains
-  double x_kP = 105.0;
-  double x_kI = 19.0;
-  double x_kD = 0.8;
+  double x_kP = 130.0;
+  double x_kI = 18.0;
+  double x_kD = 0.5;
   double y_kP = 300.0;
   double y_kI = 55.0;
   double y_kD = 0.01;
-  double y_to_theta_kP = 1.2;
+  double y_to_theta_kP = 3.0;
   double theta_kI = 5.0;
   double theta_kD = 0.3;
   // Forward/Backward wheel PID state
