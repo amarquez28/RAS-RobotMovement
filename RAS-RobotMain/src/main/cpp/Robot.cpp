@@ -512,6 +512,7 @@ void Robot::AutonomousInit() {
 
     // Reset test sequencer
     m_testStep = 0;
+    m_centerStep = 0;
     m_timer.Reset();
     m_timer.Start();
 
@@ -932,69 +933,48 @@ void Robot::AutonomousPeriodic() {
     case AutoPhase::CENTERING: {
         frc::SmartDashboard::PutString("Auto/Phase", "Centering");
 
-        // // Timeout safety: if we can't center in time, start the path anyway
-        // if (m_timer.Get().value() >= kTagSearchTimeout_s) {
-        //     StopAllDrive();
-        //     RoboClawResetAllEncoders();
-        //     m_thetaRad     = 0.0;
-        //     m_yaw_rad      = 0.0;
-        //     m_firstPidLoop = true;
-        //     ResetPidState();
-        //     m_autoPhase = AutoPhase::APPROACH;
-        //     std::cout << "[Auto] Centering timed out — starting path from current position\n";
-        //     break;
-        // }
-        //keep driving right until we see an april tag
-        if(!hasTag){
-            int8_t strafeSpeed = static_cast<int8_t>(kCenterSpeed);
-            DriveHorizontal(strafeSpeed);
-        }
-        else{
+        if (!hasTag) {
+            // Strafe +y until we see an AprilTag
+            DriveHorizontal(static_cast<int8_t>(kCenterSpeed));
+        } else {
             double pixelError = tag.x - kCameraCenter_px;
             frc::SmartDashboard::PutNumber("Auto/CenterError_px", pixelError);
 
-            if (std::abs(pixelError) <= kCenterTolerance_px)
-{
-    StopAllDrive();
-    RoboClawResetAllEncoders();
+            if (std::abs(pixelError) <= kCenterTolerance_px) {
+                // Centered — reset odometry and transition to APPROACH
+                StopAllDrive();
+                RoboClawResetAllEncoders();
+                m_firstPidLoop = true;
+                ResetPidState();
 
-    m_firstPidLoop = true;
-    ResetPidState();
+                if (fieldPose.valid) {
+                    m_thetaRad = fieldPose.theta;
+                    m_yaw_rad  = fieldPose.theta;
 
-    if (fieldPose.valid) {
-        m_thetaRad = fieldPose.theta;
-        m_yaw_rad = fieldPose.theta;
+                    frc::Pose2d visionStartPose{
+                        units::meter_t{fieldPose.x},
+                        units::meter_t{fieldPose.y},
+                        frc::Rotation2d{units::radian_t{fieldPose.theta}}
+                    };
+                    frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
+                    ResetPoseEstimator(visionStartPose, 0_m, 0_m, gyroAngle);
+                    std::cout << "[Center] Centered (error=" << pixelError
+                              << "px) — starting from VISION pose ("
+                              << fieldPose.x << ", " << fieldPose.y << ", "
+                              << fieldPose.theta << ")\n";
+                } else {
+                    m_thetaRad = 0.0;
+                    m_yaw_rad  = 0.0;
+                    frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
+                    ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
+                    std::cout << "[Center] Centered (error=" << pixelError
+                              << "px) — vision invalid, starting from INITIAL pose\n";
+                }
 
-        frc::Pose2d visionStartPose{
-            units::meter_t{fieldPose.x},
-            units::meter_t{fieldPose.y},
-            frc::Rotation2d{units::radian_t{fieldPose.theta}}
-        };
-
-        frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
-        ResetPoseEstimator(visionStartPose, 0_m, 0_m, gyroAngle);
-
-        std::cout << "[Auto] Centered (error=" << pixelError
-                  << "px) — starting path from VISION pose\n";
-    } else {
-        m_thetaRad = 0.0;
-        m_yaw_rad = 0.0;
-
-        frc::Rotation2d gyroAngle{units::radian_t{m_thetaRad}};
-        ResetPoseEstimator(m_initialPose, 0_m, 0_m, gyroAngle);
-
-        std::cout << "[Auto] Centered (error=" << pixelError
-                  << "px) — vision invalid, starting from INITIAL pose\n";
-    }
-
-    m_waypointStartTime_s = m_timer.Get().value();
-    m_autoPhase = AutoPhase::APPROACH;
-}
-            else
-            {
-                // Strafe toward tag center.
-                // If pixelError > 0 (tag is RIGHT of center) → strafe right (+speed).
-                // Flip sign here if the robot strafes the wrong way.
+                m_waypointStartTime_s = m_timer.Get().value();
+                m_autoPhase = AutoPhase::APPROACH;
+            } else {
+                // Strafe toward tag center
                 int8_t strafeSpeed = (pixelError > 0) ? static_cast<int8_t>(kCenterSpeed)
                                                       : static_cast<int8_t>(-kCenterSpeed);
                 DriveHorizontal(strafeSpeed);
