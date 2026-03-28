@@ -1053,11 +1053,11 @@ void Robot::AutonomousPeriodic() {
             //Setpoint 53 Drop
             
             if (m_currentSetpointIndex == 2 || m_currentSetpointIndex == 22 || m_currentSetpointIndex == 25 ||
-            m_currentSetpointIndex == 42 || m_currentSetpointIndex == 52) {
+            m_currentSetpointIndex == 40 || m_currentSetpointIndex == 52) {
                 ArmRaise();
             }
             if (m_currentSetpointIndex == 4 || m_currentSetpointIndex == 24 || m_currentSetpointIndex == 27 ||
-            m_currentSetpointIndex == 45 || m_currentSetpointIndex == 53) {
+            m_currentSetpointIndex == 42 || m_currentSetpointIndex == 53) {
                 ArmLower();
             }
             
