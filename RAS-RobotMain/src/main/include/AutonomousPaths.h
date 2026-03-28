@@ -81,61 +81,7 @@ static std::vector<Setpoint> Path_Default() {
     using namespace PathConst;
     return {
 
-        // ── Start (position locked by CENTERING phase) ────────────────────────
-        {  0.00,  0.00,  0.0 },  // [0] origin — encoder/IMU reset by CENTERING
-
-        // ── Beacon deposit ────────────────────────────────────────────────────
-        //    Arm is already lowered from AutonomousInit. Robot reverses to the
-        //    cave wall so the beacon rests on the ground. The waypoint completion
-        //    block dwells kServoDwell_s then calls ArmRaise() before advancing.
-        //    TODO: measure the distance to the cave wall and adjust -0.30.
-        { -0.30,  0.00,  0.0 },  // [1] reverse 30 cm to cave wall (beacon drop)
-
-        // ── Return to sweep start ─────────────────────────────────────────────
-        {  0.00,  0.00,  0.0 },  // [2] drive back to centered origin
-
-        // ── Spiral boustrophedon sweep ────────────────────────────────────────
-        //    4 rows with decreasing length (10 cm shorter at each far-end turn).
-        //    Only the 30 cm lateral shifts use the strafe motor — all long legs
-        //    use the forward/backward drive motors only.
-        //
-        //    TODO: Adjust x_far (1.80 m) to match your actual field length.
-        //    TODO: Adjust strip width (0.30 m) to match your robot brush width.
-        {  1.80,  0.00,  0.0 },  // [3] row 1 forward  — full length
-        {  1.80, -0.30,  0.0 },  // [4] shift right 30 cm
-        {  0.10, -0.30,  0.0 },  // [5] row 2 backward — 10 cm shorter at far end
-        {  0.10, -0.60,  0.0 },  // [6] shift right 30 cm
-        {  1.70, -0.60,  0.0 },  // [7] row 3 forward  — 10 cm shorter at near end too
-        {  1.70, -0.90,  0.0 },  // [8] shift right 30 cm
-
-        // ── Ore deposit ───────────────────────────────────────────────────────
-        //    Waypoint completion block triggers actuator extend → retract dwell.
-        //    Robot holds this position while ores are dumped.
-        //    TODO: Adjust x (0.20 m) so the actuator faces the collection goal.
-        {  0.20, -0.90,  0.0 },  // [9] row 4 backward — ore deposit here
-
-        // ── Transit to cave AprilTag zone → TAG_SEARCH handoff ───────────────
-        //    Robot drives to the cave entrance and reads the AprilTag to select
-        //    which cave sub-path to run (Path_1, Path_2, etc.).
-        //    kTagHandoffWaypoint = 10 in Robot.h must match this index.
-        //    TODO: Adjust x (2.20 m) and y (-0.45 m) to your cave entrance.
-        {  2.20, -0.45,  0.0 },  // [10] transit to cave entrance — TAG_SEARCH handoff
-    };
-}
-
-
-// ============================================================================
-//  Path 1  –  TAG ID 1  |  CAVE ENTRY / SWEEP
-//  Loaded after TAG_SEARCH reads tag ID 1 at the cave entrance.
-//  All coordinates are relative to the encoder reset that happens in TAG_SEARCH.
-//  Strategy notes:
-//    - Enter cave forward, sweep inside, exit in reverse.
-//    - Adjust all distances to your actual cave dimensions.
-// ============================================================================
-static std::vector<Setpoint> Path_1() {
-    using namespace PathConst;
-    return {
-         // [0] Placeholder — robot holds cave entrance position
+        // [0] Placeholder — robot holds cave entrance position
         //{0.78, 0.62, 0.0},      // 0 Origin
         {0.32, 0.62, 0.0},      // 1 Reverse 40 cm
         {0.32, 0.62, 0.0},      // 2 Pickup arm
@@ -225,6 +171,22 @@ static std::vector<Setpoint> Path_1() {
         {0.95,  0.57, pi_2},
         {0.95, 0.57, 0},
         {0.46,  0.38, 0}, //DEPOSIT
+    };
+}
+
+
+// ============================================================================
+//  Path 1  –  TAG ID 1  |  CAVE ENTRY / SWEEP
+//  Loaded after TAG_SEARCH reads tag ID 1 at the cave entrance.
+//  All coordinates are relative to the encoder reset that happens in TAG_SEARCH.
+//  Strategy notes:
+//    - Enter cave forward, sweep inside, exit in reverse.
+//    - Adjust all distances to your actual cave dimensions.
+// ============================================================================
+static std::vector<Setpoint> Path_1() {
+    using namespace PathConst;
+    return {
+        
         /*
         {0.69, 0.39, pi_2},     // 55 Reverse 42 cm
         {1.11, 0.39, pi_2},     // 56 Forward 42 cm

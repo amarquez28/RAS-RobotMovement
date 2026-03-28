@@ -439,6 +439,15 @@ frc::Pose2d Robot::UpdatePoseEstimator(units::second_t timestamp,
         rightDist
     );
 }
+wpi::array<double, 3> Robot::GetVisionStdDevsFromConfidence(double confidence) {
+    if (confidence < 60.0) {
+        return {0.18, 0.18, 0.30};
+    } else if (confidence < 80.0) {
+        return {0.10, 0.10, 0.16};
+    } else {
+        return {0.06, 0.06, 0.10};
+    }
+}
 
 // ============================================================================
 //  RobotPeriodic  – runs every packet regardless of mode
@@ -640,7 +649,67 @@ void Robot::AutonomousPeriodic() {
         if (tag.distance <= 0.0) hasTag = false; // reject invalid pose estimate
     }
 
-    // ── 7. State machine ──────────────────────────────────────────────────
+    // ── 6b. Read field pose from Pi and optionally fuse it ────────────────
+    FieldPose fieldPose = m_aprilTagReader.GetFieldPose();
+
+    bool visionPoseValid = fieldPose.valid;
+    bool visionPoseNew   = fieldPose.isNew;
+    double visionX       = fieldPose.x;
+    double visionY       = fieldPose.y;
+    double visionTheta   = fieldPose.theta;
+    double visionConf    = fieldPose.confidence;
+    int64_t visionTsUs   = fieldPose.timestamp_us;
+
+    // Vision Pose estimation
+    bool visionFused = false;
+    bool visionTimestampOk = false;
+    double visionLatencyMs = -1.0;
+
+    if (visionTsUs > 0) {
+            int64_t fpgaNowUs =
+            static_cast<int64_t>(frc::Timer::GetFPGATimestamp().value() * 1e6);
+            visionLatencyMs = (fpgaNowUs - visionTsUs) / 1000.0;
+
+        visionTimestampOk = (visionLatencyMs >= 0.0 && visionLatencyMs < 250.0);
+        }
+
+    if (visionPoseValid && visionPoseNew && visionTimestampOk) { {
+        double dxVision = visionX - x_pos;
+        double dyVision = visionY - y_pos;
+        double posErrVision = std::hypot(dxVision, dyVision);
+        double thetaErrVision = WrapAngle(visionTheta - theta_pos);
+
+        // Simple gating before fusion
+        if (posErrVision < 1.0 && std::abs(thetaErrVision) < 0.75) {
+            frc::Pose2d visionPose{
+                units::meter_t{visionX},
+                units::meter_t{visionY},
+                frc::Rotation2d{units::radian_t{visionTheta}}
+            };
+
+        auto visionStdDevs = GetVisionStdDevsFromConfidence(visionConf);
+
+        bool visionTimestampOk = false;
+        double visionLatencyMs = -1.0;
+
+        field_poseEstimator.AddVisionMeasurement(
+            visionPose,
+            units::second_t{static_cast<double>(visionTsUs) / 1e6},
+            visionStdDevs
+        );
+
+        visionFused = true;
+
+        // Refresh fused pose after adding vision
+        estPose = field_poseEstimator.GetEstimatedPosition();
+        x_pos = estPose.X().value();
+        y_pos = estPose.Y().value();
+        theta_pos = estPose.Rotation().Radians().value();
+    }
+    
+
+
+    // ── 8. State machine ──────────────────────────────────────────────────
     switch (m_autoPhase)
     {
     case AutoPhase::TEST:
@@ -678,7 +747,6 @@ void Robot::AutonomousPeriodic() {
         }
 
         // ── Field-relative robot pose (computed by Pi) ───────────────────
-        FieldPose fieldPose = m_aprilTagReader.GetFieldPose();
         frc::SmartDashboard::PutBoolean("Test/Field Pose Valid", fieldPose.valid);
         frc::SmartDashboard::PutNumber("Test/Field X (m)", fieldPose.x);
         frc::SmartDashboard::PutNumber("Test/Field Y (m)", fieldPose.y);

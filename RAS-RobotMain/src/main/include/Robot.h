@@ -154,6 +154,11 @@ class Robot : public frc::TimesliceRobot {
                                   units::meter_t rightDist,
                                   frc::Rotation2d gyroAngle);
 
+  void Robot::AddVisionToPoseEstimator(const frc::Pose2d& visionPose,
+                                     units::second_t timestamp,
+                                     const wpi::array<double, 3>& stdDevs) {
+    field_poseEstimator.AddVisionMeasurement(visionPose, timestamp, stdDevs);
+}
 
   // ── Hall sensor ─────────────────────────────────────────────────────────
   frc::AnalogInput  m_hallAnalog{0};   // AI0
@@ -195,6 +200,8 @@ class Robot : public frc::TimesliceRobot {
   double theta_deriv = 0.0;
   // Gyro bias (rad/s) – measured during CalibrateGyroZBias() in AutonomousInit
   double m_gyroZBiasRadps = 0.0;
+
+  wpi::array<double, 3> GetVisionStdDevsFromConfidence(double confidence);
 
   // Time tracking for PID dt
   units::second_t m_prevTime   = 0_s;
