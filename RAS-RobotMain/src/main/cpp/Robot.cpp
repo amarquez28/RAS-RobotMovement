@@ -1159,63 +1159,92 @@ void Robot::AutonomousPeriodic() {
                 RoboClawStopAll();
                 ResetPidState();
 
+                size_t wp = m_currentSetpointIndex;
+                double now_s = m_timer.Get().value();
+
                 // ── Beacon deposit dwell (waypoint 1) ────────────────────────
                 // Arm is already lowered from AutonomousInit. Hold position for
-                // kServoDwell_s so the beacon settles, then raise arm and advance.
-                if (m_currentSetpointIndex == 1) {
-                    double now = m_timer.Get().value();
+                // kServoDwell_s so beacon settles, then raise arm + dwell for arm.
+                if (wp == 1) {
                     if (m_servoCommandTime.value() < 0) {
-                        // First arrival — start dwell timer
-                        m_servoCommandTime = units::second_t(now);
+                        m_servoCommandTime = units::second_t(now_s);
+                        std::cout << "[Beacon] Dwelling for beacon deposit\n";
                         break;
                     }
-                    if ((now - m_servoCommandTime.value()) < kServoDwell_s) {
-                        break;  // still dwelling
-                    }
-                    // Done — raise arm, clear timer, fall through to advance
-                    ArmRaise();
+                    double elapsed = now_s - m_servoCommandTime.value();
+                    if (elapsed < kServoDwell_s) break;  // beacon settling
+                    ArmRaise();  // idempotent — called each tick during arm dwell
+                    if (elapsed < 2.0 * kServoDwell_s) break;  // arm moving
                     m_servoCommandTime = -1_s;
                     std::cout << "[Beacon] Deposit complete — arm raised\n";
                 }
 
-                // ── Ore deposit dwell (waypoint 9) ───────────────────────────
-                // Non-blocking: start extend on first arrival, poll each tick,
-                // retract when extend time elapses, advance when retract done.
-                bool isDepositWaypoint = (m_currentSetpointIndex == 9);
-                if (isDepositWaypoint) {
-                    double now = m_timer.Get().value();
+                // ── Arm raise waypoints (with dwell) ─────────────────────────
+                // WP  2: Pickup arm
+                // WP 22: Raise arm before bucket approach
+                // WP 25: Raise arm for releasing
+                // WP 28: Lift arm after grab
+                // WP 42: Open arm
+                // WP 52: Open arm (finish deposit)
+                if (wp == 2 || wp == 22 || wp == 25 || wp == 28 ||
+                    wp == 42 || wp == 52) {
+                    if (m_servoCommandTime.value() < 0) {
+                        ArmRaise();
+                        m_servoCommandTime = units::second_t(now_s);
+                        std::cout << "[Mechanism] ArmRaise at waypoint " << wp << "\n";
+                        break;
+                    }
+                    if (now_s - m_servoCommandTime.value() < kServoDwell_s) break;
+                    m_servoCommandTime = -1_s;
+                }
+
+                // ── Arm lower waypoints (with dwell) ─────────────────────────
+                // WP  4: Drop arm
+                // WP 24: Drop arm
+                // WP 27: Lower arm to grab
+                // WP 45: Drop arm
+                // WP 53: Close arm (cave entrance)
+                if (wp == 4 || wp == 24 || wp == 27 ||
+                    wp == 45 || wp == 53) {
+                    if (m_servoCommandTime.value() < 0) {
+                        ArmLower();
+                        m_servoCommandTime = units::second_t(now_s);
+                        std::cout << "[Mechanism] ArmLower at waypoint " << wp << "\n";
+                        break;
+                    }
+                    if (now_s - m_servoCommandTime.value() < kServoDwell_s) break;
+                    m_servoCommandTime = -1_s;
+                }
+
+                // ── Actuator deposit waypoints (extend → retract) ────────────
+                // WP 34: First ore deposit
+                // WP 51: Second ore deposit
+                // WP 87: Final deposit
+                if (wp == 34 || wp == 51 || wp == 87) {
                     if (m_actuatorDwellStep == 0) {
-                        // First arrival — start extending
                         ActuatorExtend(kActuatorSpeed);
-                        m_actuatorDwellStart_s = now;
+                        m_actuatorDwellStart_s = now_s;
                         m_actuatorDwellStep = 1;
-                        std::cout << "[Deposit] Extending actuator\n";
-                        break;  // come back next tick
+                        std::cout << "[Deposit] Extending actuator at waypoint " << wp << "\n";
+                        break;
                     } else if (m_actuatorDwellStep == 1) {
-                        // Waiting for full extension
-                        if (now - m_actuatorDwellStart_s < kActuatorRunTime_s) {
-                            break;  // still extending
-                        }
+                        if (now_s - m_actuatorDwellStart_s < kActuatorRunTime_s) break;
                         ActuatorStop();
                         ActuatorRetract(kActuatorSpeed);
-                        m_actuatorDwellStart_s = now;
+                        m_actuatorDwellStart_s = now_s;
                         m_actuatorDwellStep = 2;
-                        std::cout << "[Deposit] Retracting actuator\n";
+                        std::cout << "[Deposit] Retracting actuator at waypoint " << wp << "\n";
                         break;
                     } else if (m_actuatorDwellStep == 2) {
-                        // Waiting for full retraction
-                        if (now - m_actuatorDwellStart_s < kActuatorRunTime_s) {
-                            break;  // still retracting
-                        }
+                        if (now_s - m_actuatorDwellStart_s < kActuatorRunTime_s) break;
                         ActuatorStop();
-                        m_actuatorDwellStep = 0;  // reset for next deposit
-                        std::cout << "[Deposit] Done\n";
-                        // fall through to advance
+                        m_actuatorDwellStep = 0;
+                        std::cout << "[Deposit] Complete at waypoint " << wp << "\n";
                     }
                 }
 
-                // ── Path / TAG_SEARCH handoff ─────────────────────────────────
-                if (m_currentSetpointIndex == kTagHandoffWaypoint) {
+                // ── Path / TAG_SEARCH handoff ────────────────────────────────
+                if (wp == kTagHandoffWaypoint) {
                     m_timer.Reset();
                     m_timer.Start();
                     m_autoPhase = AutoPhase::TAG_SEARCH;

@@ -228,9 +228,9 @@ class Robot : public frc::TimesliceRobot {
   // TAG_SEARCH. After arriving here the robot stops, reads the AprilTag ID,
   // and loads the corresponding sub-path. Matches the end of the bucket grab
   // sequence in Path_Default (waypoint [40] per CLAUDE.md waypoint table).
-  // Waypoint index after ore deposit where robot stops and reads an AprilTag
-  // to select the cave sub-path. Update this when Path_Default changes.
-  static constexpr size_t kTagHandoffWaypoint = 10;
+  // Waypoint index where robot stops and reads an AprilTag to select a sub-path.
+  // Set to 999 to disable (path runs to completion without handoff).
+  static constexpr size_t kTagHandoffWaypoint = 999;
 
   // How long (seconds) to spend on one waypoint before skipping to the next.
   static constexpr double kWaypointTimeout_s = 8.0;
