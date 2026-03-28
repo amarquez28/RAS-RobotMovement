@@ -1181,42 +1181,11 @@ void Robot::DisabledPeriodic() {}
 
 
 void Robot::TestInit() {
-    m_testStep = 0;
-    m_timer.Reset();
-    m_timer.Start();
+    
 }
 
 
 void Robot::TestPeriodic() {
-    double t = m_timer.Get().value();
-
-    switch (m_testStep)
-    {
-    case 0:
-        ActuatorExtend(kActuatorSpeed);
-        m_testStep = 1;
-        break;
-    case 1:
-        if(t >= kActuatorRunTime_s){
-            ActuatorStop();
-            m_timer.Reset();
-            m_timer.Start();
-            m_testStep = 2;
-        }
-        break;
-    case 2:
-        ActuatorRetract(kActuatorSpeed);
-        m_testStep = 3;
-        break;
-    case 3:
-        if(t >= kActuatorRunTime_s){
-            ActuatorStop();
-            m_testStep = 4;
-        }
-        break;
-    default:
-        break;
-    }
 }
 
 
