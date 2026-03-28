@@ -381,7 +381,7 @@ double Robot::WrapAngle(double angle) {
 }
 
 void Robot::LoadAutonomousSetpoints() {
-    int tag_id = 1;
+    int tag_id = 0;  // Path_Default — Path_1 is commented out / empty
     // int tag_id = m_aprilTagReader.GetPrimaryTag().id;
     m_setpoints = AutonomousPaths::GetPath(tag_id);
     m_currentSetpointIndex = 0;
@@ -506,7 +506,7 @@ void Robot::AutonomousInit() {
     // Load the setpoint sequence for the PID approach phase
     LoadAutonomousSetpoints();
 
-    // Reset approach state machine — start by centering on the AprilTag
+    // Reset approach state machine — skip centering, go straight to APPROACH
     m_autoPhase = AutoPhase::APPROACH;
     m_taskDone  = false;
 
@@ -515,6 +515,7 @@ void Robot::AutonomousInit() {
     m_centerStep = 0;
     m_timer.Reset();
     m_timer.Start();
+    m_waypointStartTime_s = 0.0;  // timer starts at 0, so this matches
 
     // Clear NT completion flags so the Pi sees the reset
     m_taskDonePub.Set(false);
