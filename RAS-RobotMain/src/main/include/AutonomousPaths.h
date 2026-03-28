@@ -136,9 +136,103 @@ static std::vector<Setpoint> Path_1() {
     using namespace PathConst;
     return {
          // [0] Placeholder — robot holds cave entrance position
-        {0.835, 0., 0},
-        {0.79,0.2, pi_2},
-        {0.79, 0.2, -pi_2}
+ {0.78, 0.48, 0.0},      // 0 Origin
+        {0.38, 0.48, 0.0},      // 1 Reverse 40 cm
+        {0.38, 0.48, 0.0},      // 2 Pickup arm
+        {0.17, 0.48, 0.0},      // 3 Reverse 21 cm
+        {0.17, 0.48, 0.0},      // 4 Drop arm
+        {0.17, 0.48, pi_2},     // 5 Turn left 90°
+        {0.17, 0.78, pi_2},     // 6 Forward 30 cm along rotated x→y
+        {0.17, 0.78, 0.0},      // 7 Turn right 90°
+        {0.37, 0.48, 0.0},      // 8 Forward 20 cm
+        {0.37, 0.48, -pi_2},    // 9 Turn right 90°
+        {0.37, -0.22, -pi/2},   // 10 Forward 70 cm
+        {0.37, -0.22, 0.0},     // 11 Turn left 90°
+        {0.57, -0.22, 0.0},     // 12 Forward 20 cm
+        {0.57, -0.22, pi_2},    // 13 Turn left 90°
+        {0.57, 0.29, pi_2},     // 14 Forward 51 cm
+        {0.57, -0.22, pi_2},    // 15 Reverse 51 cm
+        {0.57, -0.22, 0.0},     // 16 Turn right 90°
+        {0.74, -0.22, 0.0},     // 17 Forward 17 cm
+        {0.74, -0.22, pi_2},    // 18 Turn left 90°
+        {0.74, 0.29, pi_2},     // 19 Forward 51 cm
+        {0.74, 0.29, 0.0},      // 20 Turn right 90°
+        {0.74, 0.29, -pi_2},    // 21 Turn right 90°
+        {0.74, 0.29, -pi_2},    // 22 Raise arm
+        {0.74, 0.37, -pi_2},    // 23 Reverse 8 cm
+        {0.74, 0.37, -pi_2},    // 24 Drop arm
+        {0.74, 0.12, -pi_2},    // 25 Forward 25 cm
+        {0.74, 0.12, 0.0},      // 26 Turn left 90°
+        {0.31, 0.12, 0.0},      // 27 Reverse 43 cm
+        {0.31, 0.12, 0.0},      // 28 Lift arm
+        {0.74, 0.12, 0.0},      // 29 Forward 43 cm
+        {0.74, 0.12, -pi_2},    // 30 Turn right 90°
+        {0.74, -0.01, -pi_2},   // 31 Forward 13 cm
+        {0.74, -0.01, 0.0},     // 32 Turn left 90°
+        {0.29, -0.01, 0.0},     // 33 Reverse 45 cm
+        {0.29, -0.01, 0.0},     // 34 Deposit
+        {1.21, -0.01, 0.0},     // 35 Forward 92 cm
+        {0.71, -0.01, 0.0},     // 36 Reverse 50 cm
+        {0.71, -0.01, -pi_2},   // 37 Turn right 90°
+        {0.71, -0.21, -pi_2},   // 38 Forward 20 cm
+        {0.71, -0.21, pi_2},    // 39 Turn left 90°
+        {1.06, -0.21, pi_2},    // 40 Forward 35 cm
+        {0.71, -0.21, pi_2},    // 41 Reverse 35 cm
+        {0.71, -0.21, pi_2},    // 42 Turn left 90°
+        {0.71, 0.19, pi_2},     // 43 Forward 40 cm
+        {0.71, 0.19, -pi_2},    // 44 Turn right 90°
+        {1.23, 0.19, -pi_2},    // 45 Forward 52 cm
+        {0.71, 0.19, -pi_2},    // 46 Reverse 52 cm
+        {0.71, 0.19, pi_2},     // 47 Turn left 90°
+        {0.71, 0.39, pi_2},     // 48 Forward 20 cm
+        {0.71, 0.39, -pi_2},    // 49 Turn right 90°
+        {1.23, 0.39, -pi_2},    // 50 Forward 52 cm
+        {0.71, 0.39, -pi_2},    // 51 Reverse 52 cm
+        {0.71, 0.39, 0.0},      // 52 Turn right 90°
+        {1.11, 0.39, 0.0},      // 53 Forward 40 cm
+        {1.11, 0.39, pi_2},     // 54 Turn left 90°
+        {0.69, 0.39, pi_2},     // 55 Reverse 42 cm
+        {1.11, 0.39, pi_2},     // 56 Forward 42 cm
+        {1.11, 0.39, pi_2},     // 57 Turn left 90°
+        {1.26, 0.39, pi_2},     // 58 Forward 15 cm
+        {1.26, 0.39, -pi_2},    // 59 Turn right 90°
+        {2.76, 0.39, -pi_2},    // 60 Forward 150 cm
+        {2.28, 0.39, -pi_2},    // 61 Reverse 48 cm
+        {2.28, 0.39, pi_2},     // 62 Turn left 90°
+        {2.68, 0.39, pi_2},     // 63 Forward 40 cm
+        {2.28, 0.39, pi_2},     // 64 Reverse 40 cm
+        {2.28, 0.39, -pi_2},    // 65 Turn right 90°
+        {2.48, 0.39, -pi_2},    // 66 Forward 20 cm
+        {2.48, 0.39, pi_2},     // 67 Turn left 90°
+        {2.88, 0.39, pi_2},     // 68 Forward 40 cm
+        {2.48, 0.39, pi_2},     // 69 Reverse 40 cm
+        {2.48, 0.39, -pi_2},    // 70 Turn right 90°
+        {2.67, 0.39, -pi_2},    // 71 Forward 19 cm
+        {2.67, 0.39, pi_2},     // 72 Turn left 90°
+        {3.07, 0.39, pi_2},     // 73 Forward 40 cm
+        {2.67, 0.39, pi_2},     // 74 Reverse 40 cm
+        {2.67, 0.39, pi_2},     // 75 Turn left 90°
+        {2.67, 0.39, pi_2},     // 76 Turn left 90°
+        {3.07, 0.39, pi_2},     // 77 Forward 40 cm
+        {2.67, 0.39, pi_2},     // 78 Reverse 40 cm
+        {2.67, 0.39, -pi_2},    // 79 Turn right 90°
+        {2.86, 0.39, -pi_2},    // 80 Forward 19 cm
+        {2.86, 0.39, pi_2},     // 81 Turn left 90°
+        {3.26, 0.39, pi_2},     // 82 Forward 40 cm
+        {2.86, 0.39, pi_2},     // 83 Reverse 40 cm
+        {2.86, 0.39, -pi_2},    // 84 Turn right 90°
+        {3.06, 0.39, -pi_2},    // 85 Forward 20 cm
+        {3.06, 0.39, pi_2},     // 86 Turn left 90°
+        {3.46, 0.39, pi_2},     // 87 Forward 40 cm
+        {3.06, 0.39, pi_2},     // 88 Reverse 40 cm
+        {3.06, 0.39, pi_2},     // 89 Turn left 90°
+        {1.86, 0.39, pi_2},     // 90 Reverse 120 cm
+        {1.86, 0.39, pi},       // 91 Turn left 90°
+        {1.72, 0.39, pi},       // 92 Reverse 14 cm
+        {1.46, 0.39, pi},       // 93 Reverse 26 cm
+        {1.46, 0.39, pi},       // 94 Deposit
+        {2.16, 0.39, pi},       // 95 Forward 70 cm
+        {2.16, 0.39, pi_2},     // 96 Turn left 90°
     };
 }
 
