@@ -137,8 +137,8 @@ static std::vector<Setpoint> Path_1() {
     return {
          // [0] Placeholder — robot holds cave entrance position
         {0.79, 0.4, pi_2},
-        {0.79,0.20, pi_2},
-        {0.79, 0.20, -pi_2}
+        {0.79,0.2, pi_2},
+        {0.79, 0.2, -pi_2}
     };
 }
 

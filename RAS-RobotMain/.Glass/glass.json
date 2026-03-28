@@ -1,0 +1,33 @@
+{
+  "NetworkTables": {
+    "retained": {
+      "SmartDashboard": {
+        "Auto Modes": {
+          "open": true
+        },
+        "open": true
+      }
+    },
+    "transitory": {
+      "SmartDashboard": {
+        "IMU": {
+          "open": true
+        },
+        "Vision": {
+          "open": true
+        },
+        "open": true
+      }
+    },
+    "types": {
+      "/FMSInfo": "FMSInfo",
+      "/SmartDashboard/Auto Modes": "String Chooser"
+    }
+  },
+  "NetworkTables Info": {
+    "visible": true
+  },
+  "NetworkTables Settings": {
+    "mode": "Client (NT3)"
+  }
+}
