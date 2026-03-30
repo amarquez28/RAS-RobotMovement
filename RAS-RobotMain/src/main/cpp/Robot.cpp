@@ -350,27 +350,6 @@ void Robot::CalibrateGyroZBias() {
 }
 
 // ============================================================================
-//  Encoder odometry update
-// ============================================================================
-
-void Robot::UpdateEncoders() {
-    uint8_t s1, s2;
-    int32_t raw1 = 0, raw2 = 0;
-
-    bool ok1 = RoboClawReadEncoderM1(kRoboClawAddr_Drive,  raw1, s1);
-    bool ok2 = RoboClawReadEncoderM1(kRoboClawAddr_Strafe, raw2, s2);
-
-    m_encodersValid = ok1 && ok2;
-    if (ok1) m_vertTicks  = raw1;
-    if (ok2) m_horizTicks = raw2;
-
-    frc::SmartDashboard::PutBoolean("Enc/DriveOK",   ok1);
-    frc::SmartDashboard::PutBoolean("Enc/StrafeOK",  ok2);
-    frc::SmartDashboard::PutNumber ("Enc/VertTicks",  m_vertTicks);
-    frc::SmartDashboard::PutNumber ("Enc/HorizTicks", m_horizTicks);
-}
-
-// ============================================================================
 //  PID helpers – setpoint list management
 // ============================================================================
 
@@ -1065,11 +1044,11 @@ void Robot::AutonomousPeriodic() {
 
             // Gain scheduling for theta: larger P when heading error is large
             double abs_theta = std::abs(theta_error);
-            double sched_kP  = 23.0;
+            double sched_kP  = 25.0;
             if (abs_theta > std::numbers::pi / 4)
-                sched_kP = 50.0;
+                sched_kP = 60.0;
             else if (abs_theta > std::numbers::pi / 12)
-                sched_kP = 37.0;
+                sched_kP = 40.0;
 
             double x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv;
             double y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv;
