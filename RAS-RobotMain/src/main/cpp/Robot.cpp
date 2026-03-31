@@ -33,6 +33,11 @@
 #include <units/angle.h>
 #include <units/length.h>
 
+//CSV includes
+#include <filesystem>
+#include <iomanip>
+#include <sstream>
+
 // ── File-scope IMU helper ────────────────────────────────────────────────────
 // Convert two big-endian bytes to a signed 16-bit integer.
 // Defined first so every function below can use it without a forward declaration.
@@ -429,6 +434,131 @@ wpi::array<double, 3> Robot::GetVisionStdDevsFromConfidence(double confidence) {
 }
 
 // ============================================================================
+//  CSV Helpers  – All the functions that will help capture every variable
+// ============================================================================
+
+void Robot::StartAutoCsvLog() {
+    StopAutoCsvLog();
+
+    std::filesystem::create_directories("/home/lvuser/logs");
+
+    auto nowUs = static_cast<int64_t>(frc::Timer::GetFPGATimestamp().value() * 1e6);
+
+    std::ostringstream path;
+    path << "/home/lvuser/logs/auto_log_" << nowUs << ".csv";
+
+    m_autoLog.open(path.str(), std::ios::out | std::ios::trunc);
+    m_autoLogHeaderWritten = false;
+    m_autoLogLoop = 0;
+
+    if (!m_autoLog.is_open()) {
+        std::cout << "[CSV] Failed to open log file: " << path.str() << "\n";
+        return;
+    }
+
+    m_autoLog
+        << "loop,"
+        << "rio_time_s,rio_time_us,loop_dt_s,"
+        << "odom_x,odom_y,odom_theta,"
+        << "vision_pose_valid,vision_pose_new,vision_x,vision_y,vision_theta,vision_conf,vision_ts_us,"
+        << "vision_timestamp_ok,vision_latency_ms,vision_fused,"
+        << "fused_x,fused_y,fused_theta,"
+        << "auto_phase,waypoint_index,"
+        << "has_tag,tag_id,tag_ts_us,"
+        << "sync_delta_ms,"
+        << "x_target,y_target,theta_target,"
+        << "x_error,y_error,theta_error,"
+        << "x_cmd,y_cmd,theta_cmd,"
+        << "xr_cmd,xl_cmd,spdr,spdl"
+        << "\n";
+
+    m_autoLogHeaderWritten = true;
+    std::cout << "[CSV] Logging to " << path.str() << "\n";
+}
+
+void Robot::StopAutoCsvLog() {
+    if (m_autoLog.is_open()) {
+        m_autoLog.flush();
+        m_autoLog.close();
+        std::cout << "[CSV] Log closed\n";
+    }
+}
+
+void Robot::LogAutoCsvRow(
+    double rioTimeS,
+    int64_t rioTimeUs,
+    double dt,
+
+    double odomX,
+    double odomY,
+    double odomTheta,
+
+    bool visionPoseValid,
+    bool visionPoseNew,
+    double visionX,
+    double visionY,
+    double visionTheta,
+    double visionConf,
+    int64_t visionTsUs,
+    bool visionTimestampOk,
+    double visionLatencyMs,
+    bool visionFused,
+
+    double fusedX,
+    double fusedY,
+    double fusedTheta,
+
+    const std::string& autoPhase,
+    int waypointIndex,
+
+    bool hasTag,
+    int tagId,
+    int64_t tagTsUs,
+
+    double xTarget,
+    double yTarget,
+    double thetaTarget,
+    double xError,
+    double yError,
+    double thetaError,
+    double xCmd,
+    double yCmd,
+    double thetaCmd,
+    double xrCmd,
+    double xlCmd,
+    double spdr,
+    double spdl
+) {
+    if (!m_autoLog.is_open()) return;
+
+    double syncDeltaMs = (visionTsUs > 0)
+        ? (static_cast<double>(rioTimeUs - visionTsUs) / 1000.0)
+        : -1.0;
+
+    m_autoLog << std::fixed << std::setprecision(6)
+        << m_autoLogLoop++ << ","
+        << rioTimeS << "," << rioTimeUs << "," << dt << ","
+        << odomX << "," << odomY << "," << odomTheta << ","
+        << (visionPoseValid ? 1 : 0) << ","
+        << (visionPoseNew ? 1 : 0) << ","
+        << visionX << "," << visionY << "," << visionTheta << "," << visionConf << "," << visionTsUs << ","
+        << (visionTimestampOk ? 1 : 0) << "," << visionLatencyMs << "," << (visionFused ? 1 : 0) << ","
+        << fusedX << "," << fusedY << "," << fusedTheta << ","
+        << "\"" << autoPhase << "\"" << "," << waypointIndex << ","
+        << (hasTag ? 1 : 0) << "," << tagId << "," << tagTsUs << ","
+        << syncDeltaMs << ","
+        << xTarget << "," << yTarget << "," << thetaTarget << ","
+        << xError << "," << yError << "," << thetaError << ","
+        << xCmd << "," << yCmd << "," << thetaCmd << ","
+        << xrCmd << "," << xlCmd << "," << spdr << "," << spdl
+        << "\n";
+
+    if ((m_autoLogLoop % 25) == 0) {
+        m_autoLog.flush();
+    }
+}
+
+// ============================================================================
 //  RobotPeriodic  – runs every packet regardless of mode
 // ============================================================================
 
@@ -524,6 +654,8 @@ void Robot::AutonomousInit() {
 
     std::cout << "[Auto] AutonomousInit complete\n";
     
+    //CSV initializer
+    StartAutoCsvLog();
 }
 
 // ============================================================================
@@ -600,9 +732,14 @@ void Robot::AutonomousPeriodic() {
 
     frc::Pose2d estPose = UpdatePoseEstimator(now, xl_pos, xr_pos, gyroAngle);
 
-    double x_pos = estPose.X().value();
-    double y_pos = estPose.Y().value();
-    double theta_pos = estPose.Rotation().Radians().value();
+    double odom_x = estPose.X().value();
+    double odom_y = estPose.Y().value();
+    double odom_theta = estPose.Rotation().Radians().value();
+
+    // Start fused pose as same as odom pose
+    double x_pos = odom_x;
+    double y_pos = odom_y;
+    double theta_pos = odom_theta;
 
     frc::SmartDashboard::PutNumber("Pose/X_m", x_pos);
     frc::SmartDashboard::PutNumber("Pose/Y_m", y_pos);
@@ -676,6 +813,31 @@ void Robot::AutonomousPeriodic() {
         }
     }
 
+    //CSV VARIABLES
+    std::string autoPhaseStr = "APPROACH";
+    int waypointIndexForLog = static_cast<int>(m_currentSetpointIndex);
+
+    int tagIdForLog = hasTag ? tag.id : -1;
+    int64_t tagTsUsForLog = hasTag ? tag.timestamp_us : -1;
+
+    // Default values for cycles that are not APPROACH
+    double x_target_log = 0.0;
+    double y_target_log = 0.0;
+    double theta_target_log = 0.0;
+
+    double x_error_log = 0.0;
+    double y_error_log = 0.0;
+    double theta_error_log = 0.0;
+
+    double x_cmd_log = 0.0;
+    double y_cmd_log = 0.0;
+    double theta_cmd_log = 0.0;
+
+    double xr_cmd_log = 0.0;
+    double xl_cmd_log = 0.0;
+
+    double spdr_log = 0.0;
+    double spdl_log = 0.0;
 
     // ── 8. State machine ──────────────────────────────────────────────────
     switch (m_autoPhase)
@@ -877,7 +1039,8 @@ void Robot::AutonomousPeriodic() {
             double spdr = std::abs(xr_cmd);
             double spdl = std::abs(xl_cmd);
             double spdy = std::abs(y_cmd);
-             // Right drive (M1 on 0x80)
+
+            // Right drive (M1 on 0x80)
             if      (xr_cmd > 0.0) RoboClawM1Forward (kRoboClawAddr_Drive, static_cast<uint8_t>(spdr));
             else if (xr_cmd < 0.0) RoboClawM1Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdr));
             else                   RoboClawM1Forward  (kRoboClawAddr_Drive, 0);
@@ -1233,6 +1396,26 @@ void Robot::AutonomousPeriodic() {
             double spdl = std::abs(xl_cmd);
             double spdy = std::abs(y_cmd);
 
+                        autoPhaseStr = "APPROACH";
+
+            x_target_log = x_target;
+            y_target_log = y_target;
+            theta_target_log = theta_target;
+
+            x_error_log = x_error;
+            y_error_log = y_error;
+            theta_error_log = theta_error;
+
+            x_cmd_log = x_cmd;
+            y_cmd_log = y_cmd;
+            theta_cmd_log = theta_cmd;
+
+            xr_cmd_log = xr_cmd;
+            xl_cmd_log = xl_cmd;
+
+            spdr_log = spdr;
+            spdl_log = spdl;
+
             // Right drive (M1 on 0x80)
             if      (xr_cmd > 0.0) RoboClawM1Forward (kRoboClawAddr_Drive, static_cast<uint8_t>(spdr));
             else if (xr_cmd < 0.0) RoboClawM1Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdr));
@@ -1273,6 +1456,56 @@ void Robot::AutonomousPeriodic() {
     frc::SmartDashboard::PutNumber("Auto/ElapsedTime_s", m_timer.Get().value());
     frc::SmartDashboard::PutNumber("Auto/VertTicks",     m_vertTicks);
     frc::SmartDashboard::PutNumber("Auto/HorizTicks",    m_horizTicks);
+
+    if (m_autoPhase == AutoPhase::APPROACH) {
+    int64_t rioNowUs = static_cast<int64_t>(now.value() * 1e6);
+
+    LogAutoCsvRow(
+        now.value(),
+        rioNowUs,
+        dt,
+
+        odom_x,
+        odom_y,
+        odom_theta,
+
+        visionPoseValid,
+        visionPoseNew,
+        visionX,
+        visionY,
+        visionTheta,
+        visionConf,
+        visionTsUs,
+        visionTimestampOk,
+        visionLatencyMs,
+        visionFused,
+
+        x_pos,
+        y_pos,
+        theta_pos,
+
+        "APPROACH",
+        waypointIndexForLog,
+
+        hasTag,
+        tagIdForLog,
+        tagTsUsForLog,
+
+        x_target_log,
+        y_target_log,
+        theta_target_log,
+        x_error_log,
+        y_error_log,
+        theta_error_log,
+        x_cmd_log,
+        y_cmd_log,
+        theta_cmd_log,
+        xr_cmd_log,
+        xl_cmd_log,
+        spdr_log,
+        spdl_log
+    );
+}
 }
 
 // ============================================================================
@@ -1355,6 +1588,7 @@ void Robot::TeleopPeriodic() {}
 void Robot::DisabledInit() {
     StopAllDrive();
     RoboClawDrain();
+    StopAutoCsvLog();
 }
 
 void Robot::DisabledPeriodic() {}

@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <string>
-
 #include <frc/TimesliceRobot.h>
 #include <frc/smartdashboard/SendableChooser.h>
 #include <frc/PWM.h>
@@ -31,6 +29,10 @@
 #include <frc/estimator/DifferentialDrivePoseEstimator.h>
 #include <units/length.h>
 #include <units/angle.h>
+
+//CSV Log
+#include <fstream>
+#include <string>
 
 // ── Autonomous phase ─────────────────────────────────────────────────────────
 // CENTERING : Strafe until the AprilTag is centered in the camera frame.
@@ -355,4 +357,57 @@ class Robot : public frc::TimesliceRobot {
   void TestActuator();  // Extends actuator → waits → retracts
 
   int m_testStep = 0;   // Step counter used by TestPeriodic() sequencer
+
+  //CSV log members
+  std::ofstream m_autoLog;
+  bool m_autoLogHeaderWritten = false;
+  int m_autoLogLoop = 0;
+
+  void StartAutoCsvLog();
+  void StopAutoCsvLog();
+  void LogAutoCsvRow(
+      double rioTimeS,
+      int64_t rioTimeUs,
+      double dt,
+
+      double odomX,
+      double odomY,
+      double odomTheta,
+
+      bool visionPoseValid,
+      bool visionPoseNew,
+      double visionX,
+      double visionY,
+      double visionTheta,
+      double visionConf,
+      int64_t visionTsUs,
+      bool visionTimestampOk,
+      double visionLatencyMs,
+      bool visionFused,
+
+      double fusedX,
+      double fusedY,
+      double fusedTheta,
+
+      const std::string& autoPhase,
+      int waypointIndex,
+
+      bool hasTag,
+      int tagId,
+      int64_t tagTsUs,
+
+      double xTarget,
+      double yTarget,
+      double thetaTarget,
+      double xError,
+      double yError,
+      double thetaError,
+      double xCmd,
+      double yCmd,
+      double thetaCmd,
+      double xrCmd,
+      double xlCmd,
+      double spdr,
+      double spdl
+    );
 };
