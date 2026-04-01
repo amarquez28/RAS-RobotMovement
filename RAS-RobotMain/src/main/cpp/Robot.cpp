@@ -521,9 +521,8 @@ void Robot::LogAutoCsvRow(
     double xError,
     double yError,
     double thetaError,
-    double xCmd,
-    double yCmd,
-    double thetaCmd,
+    double vCmd,
+    double omegaCmd,
     double xrCmd,
     double xlCmd,
     double spdr,
@@ -549,7 +548,7 @@ void Robot::LogAutoCsvRow(
         << syncDeltaMs << ","
         << xTarget << "," << yTarget << "," << thetaTarget << ","
         << xError << "," << yError << "," << thetaError << ","
-        << xCmd << "," << yCmd << "," << thetaCmd << ","
+        << vCmd << "," << omegaCmd << ","
         << xrCmd << "," << xlCmd << "," << spdr << "," << spdl
         << "\n";
 
@@ -829,9 +828,8 @@ void Robot::AutonomousPeriodic() {
     double y_error_log = 0.0;
     double theta_error_log = 0.0;
 
-    double x_cmd_log = 0.0;
-    double y_cmd_log = 0.0;
-    double theta_cmd_log = 0.0;
+    double v_cmd_log = 0.0;
+    double omega_cmd_log = 0.0;
 
     double xr_cmd_log = 0.0;
     double xl_cmd_log = 0.0;
@@ -1191,18 +1189,21 @@ void Robot::AutonomousPeriodic() {
             frc::SmartDashboard::PutNumber("PID/y_pos", y_pos);
             frc::SmartDashboard::PutNumber("PID/theta_pos", theta_pos);
 
+            //MAYBE, IN CASE LATERAL ERROR CREATES INSANE STEERING REQUESTS
+            //double theta_correction = std::clamp(y_to_theta_kP * y_error, -0.5, 0.5);
+            //double theta_ref = theta_target + theta_correction;
+            //double theta_error = WrapAngle(theta_ref - theta_pos);
+
             // Outer loop: lateral error creates a heading reference correction
             double theta_ref = theta_target + y_to_theta_kP * y_error;
             double theta_error = WrapAngle(theta_ref - theta_pos);
 
             // Integrate
             x_integral     += x_error     * dt;
-            y_integral     += y_error     * dt;
             theta_integral += theta_error * dt;
 
             // Differentiate
             double x_deriv     = (x_error     - x_prevError)     / dt;
-            double y_deriv     = (y_error     - y_prevError)     / dt;
             double theta_deriv = (theta_error - theta_prevError) / dt;
 
             // Gain scheduling for theta: larger P when heading error is large
@@ -1213,57 +1214,46 @@ void Robot::AutonomousPeriodic() {
             else if (abs_theta > std::numbers::pi / 12)
                 sched_kP = 40.0;
 
-            double x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv;
-            double y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv;
-            double theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv;
+            double v_cmd = x_kP * x_error + x_kI * x_integral + x_kD * x_deriv;
+            double omega_cmd = sched_kP * theta_error
+                 + theta_kI * theta_integral
+                 + theta_kD * theta_deriv;
 
             // Anti-windup: only freeze the integral when the output is saturated.
             // If saturated, undo this tick's accumulation and recompute.
-            if (std::abs(x_cmd)     > 127.0) { x_integral     -= x_error     * dt; x_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv; }
-            if (std::abs(y_cmd)     > 127.0) { y_integral     -= y_error     * dt; y_cmd     = y_kP     * y_error     + y_kI     * y_integral     + y_kD     * y_deriv; }
-            if (std::abs(theta_cmd) >  80.0) { theta_integral -= theta_error * dt; theta_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv; }
+            if (std::abs(v_cmd)     > 127.0) { x_integral     -= x_error     * dt; v_cmd     = x_kP     * x_error     + x_kI     * x_integral     + x_kD     * x_deriv; }
+            if (std::abs(omega_cmd) >  80.0) { theta_integral -= theta_error * dt; omega_cmd = sched_kP * theta_error + theta_kI * theta_integral + theta_kD * theta_deriv; }
 
-            y_cmd = 0.0;   
-            y_integral = 0.0;
-            y_prevError = 0.0;
-            y_deriv = 0.0;
+            double heading_scale = std::max(0.0, std::cos(theta_error));
+            v_cmd *= heading_scale;
 
             // Save errors for next derivative calculation
             x_prevError     = x_error;
-            y_prevError     = y_error;
             theta_prevError = theta_error;
 
             // Zero out axis when within tolerance (also prevents integral windup)
-            constexpr double kXTol     = 0.002;
-            constexpr double kYTol     = 0.002;
+            constexpr double kPosTol     = 0.002;
             constexpr double kThetaTol = 0.05; // ~3° — tight enough for accuracy, wide enough to settle
-            if (std::abs(x_error) <= kXTol)
+            double pos_error = std::hypot(dx_field, dy_field);
+            bool pos_done = pos_error <= kPosTol;
+            bool theta_done = std::abs(theta_error) <= kThetaTol;
+
+            if (std::abs(x_error) <= kPosTol)
             {
-                x_cmd = 0.0;
+                v_cmd = 0.0;
                 x_integral = 0.0;
                 x_prevError = 0.0;
                 x_deriv = 0.0;
             }
-            if (std::abs(y_error) <= kYTol)
-            {
-                y_cmd = 0.0;
-                y_integral = 0.0;
-                y_prevError = 0.0;
-                y_deriv = 0.0;
-            }
             if (std::abs(theta_error) <= kThetaTol)
             {
-                theta_cmd = 0.0;
+                omega_cmd = 0.0;
                 theta_integral = 0.0;
                 theta_prevError = 0.0;
                 theta_deriv = 0.0;
             }
 
-            bool x_done     = (std::abs(x_error)     <= kXTol);
-            bool y_done = !m_enableYControl || (std::abs(y_error) <= kYTol);
-            bool theta_done = (std::abs(theta_error) <= kThetaTol);
-
-            if (x_done && y_done && theta_done) {
+            if (pos_done && theta_done) {
                 RoboClawStopAll();
                 ResetPidState();
 
@@ -1362,39 +1352,28 @@ void Robot::AutonomousPeriodic() {
             }
 
             // Saturate
-            x_cmd     = std::clamp(x_cmd,     -127.0, 127.0);
-            y_cmd     = std::clamp(y_cmd,     -127.0, 127.0);
-            theta_cmd = std::clamp(theta_cmd,  -80.0,  80.0);
+            v_cmd     = std::clamp(v_cmd,     -127.0, 127.0);
+            omega_cmd = std::clamp(omega_cmd,  -80.0,  80.0);
 
             // Minimum command (deadband kick) outside tolerance only
-            if (theta_cmd > 0.0 && theta_cmd < 15.0) theta_cmd = 15.0;
-            if (theta_cmd < 0.0 && theta_cmd > -15.0) theta_cmd = -15.0;
-            if (y_cmd > 0.0 && y_cmd < 25.0) y_cmd = 25.0;
-            if (y_cmd < 0.0 && y_cmd > -25.0) y_cmd = -25.0;
-
-            if (!m_enableYControl) {
-                y_cmd = 0.0;
-                y_integral = 0.0;
-                y_prevError = 0.0;
-                y_deriv = 0.0;
-            }
+            if (omega_cmd > 0.0 && omega_cmd < 15.0) omega_cmd = 15.0;
+            if (omega_cmd < 0.0 && omega_cmd > -15.0) omega_cmd = -15.0;
 
             // Differential mixing for drive wheels
-            double xr_cmd = std::clamp(x_cmd + theta_cmd, -127.0, 127.0);
-            double xl_cmd = std::clamp(x_cmd - theta_cmd, -127.0, 127.0);
+            double xr_cmd = std::clamp(v_cmd + omega_cmd, -127.0, 127.0);
+            double xl_cmd = std::clamp(v_cmd - omega_cmd, -127.0, 127.0);
             if (xr_cmd > 0.0 && xr_cmd < 25.0) xr_cmd = 25.0;
             if (xr_cmd < 0.0 && xr_cmd > -25.0) xr_cmd = -25.0;
             if (xl_cmd > 0.0 && xl_cmd < 25.0) xl_cmd = 25.0;
             if (xl_cmd < 0.0 && xl_cmd > -25.0) xl_cmd = -25.0;
 
-            frc::SmartDashboard::PutNumber("PID/x_cmd", x_cmd);
-            frc::SmartDashboard::PutNumber("PID/theta_cmd", theta_cmd);
+            frc::SmartDashboard::PutNumber("PID/v_cmd", v_cmd);
+            frc::SmartDashboard::PutNumber("PID/theta_cmd", omega_cmd);
             frc::SmartDashboard::PutNumber("PID/xr_cmd", xr_cmd);
             frc::SmartDashboard::PutNumber("PID/xl_cmd", xl_cmd);
 
             double spdr = std::abs(xr_cmd);
             double spdl = std::abs(xl_cmd);
-            double spdy = std::abs(y_cmd);
 
                         autoPhaseStr = "APPROACH";
 
@@ -1406,9 +1385,8 @@ void Robot::AutonomousPeriodic() {
             y_error_log = y_error;
             theta_error_log = theta_error;
 
-            x_cmd_log = x_cmd;
-            y_cmd_log = y_cmd;
-            theta_cmd_log = theta_cmd;
+            v_cmd_log = v_cmd;
+            omega_cmd_log = omega_cmd;
 
             xr_cmd_log = xr_cmd;
             xl_cmd_log = xl_cmd;
@@ -1426,8 +1404,6 @@ void Robot::AutonomousPeriodic() {
             else if (xl_cmd < 0.0) RoboClawM2Backward(kRoboClawAddr_Drive, static_cast<uint8_t>(spdl));
             else                   RoboClawM2Forward  (kRoboClawAddr_Drive, 0);
 
-            RoboClawM1Forward(kRoboClawAddr_Strafe, 0);
-
             // PID telemetry
             frc::SmartDashboard::PutNumber("PID/WaypointIndex",
                 static_cast<double>(m_currentSetpointIndex));
@@ -1439,9 +1415,8 @@ void Robot::AutonomousPeriodic() {
             frc::SmartDashboard::PutNumber("PID/X_Error",     x_error);
             frc::SmartDashboard::PutNumber("PID/Y_Error",     y_error);
             frc::SmartDashboard::PutNumber("PID/Theta_Error", theta_error);
-            frc::SmartDashboard::PutNumber("PID/X_Cmd",       x_cmd);
-            frc::SmartDashboard::PutNumber("PID/Y_Cmd",       y_cmd);
-            frc::SmartDashboard::PutNumber("PID/Theta_Cmd",   theta_cmd);
+            frc::SmartDashboard::PutNumber("PID/V_Cmd",       v_cmd);
+            frc::SmartDashboard::PutNumber("PID/Omega_Cmd",   omega_cmd);
             frc::SmartDashboard::PutNumber("PID/XR_Mixed",    xr_cmd);
             frc::SmartDashboard::PutNumber("PID/XL_Mixed",    xl_cmd);
         }
@@ -1497,9 +1472,8 @@ void Robot::AutonomousPeriodic() {
         x_error_log,
         y_error_log,
         theta_error_log,
-        x_cmd_log,
-        y_cmd_log,
-        theta_cmd_log,
+        v_cmd_log,
+        omega_cmd_log,
         xr_cmd_log,
         xl_cmd_log,
         spdr_log,

@@ -16,6 +16,15 @@
         "open": true
       },
       "SmartDashboard": {
+        "Auto": {
+          "open": true
+        },
+        "Auto Modes": {
+          "open": true
+        },
+        "Hall": {
+          "open": true
+        },
         "IMU": {
           "open": true
         },
@@ -51,6 +60,6 @@
     "visible": true
   },
   "NetworkTables Settings": {
-    "mode": "Client (NT4)"
+    "mode": "Client (NT3)"
   }
 }
