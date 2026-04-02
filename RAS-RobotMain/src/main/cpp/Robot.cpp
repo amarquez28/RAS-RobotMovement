@@ -715,9 +715,6 @@ void Robot::AutonomousPeriodic() {
     constexpr double kXMetPerPul  = kWheelCirc / 758.8;
     constexpr double kYMetPerPul  = kWheelCirc / 1425.1;
 
-    int32_t e80_m1 = 0, e80_m2 = 0, e81_m1 = 0;
-    uint8_t s80_m1,     s80_m2,     s81_m1;
-
     int32_t e80_m1 = m_lastDriveRightCount;
     int32_t e80_m2 = m_lastDriveLeftCount;
     int32_t e81_m1 = m_lastStrafeCount;
