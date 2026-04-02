@@ -468,7 +468,7 @@ void Robot::StartAutoCsvLog() {
         << "sync_delta_ms,"
         << "x_target,y_target,theta_target,"
         << "x_error,y_error,theta_error,"
-        << "x_cmd,y_cmd,theta_cmd,"
+        << "v_cmd,omega_cmd,"
         << "xr_cmd,xl_cmd,spdr,spdl"
         << "\n";
 
@@ -597,6 +597,11 @@ void Robot::AutonomousInit() {
     // Reset all encoders to zero so dead-reckoning is relative to start pos
     RoboClawResetAllEncoders();
 
+    //Reset last encoder position so new ones can be stored on top of that value
+    m_lastDriveRightCount = 0;
+    m_lastDriveLeftCount  = 0;
+    m_lastStrafeCount     = 0;
+
     // Reconfigure IMU and reset software-integrated heading state
     IMUInit();
     ResetIMUState();
@@ -713,9 +718,29 @@ void Robot::AutonomousPeriodic() {
     int32_t e80_m1 = 0, e80_m2 = 0, e81_m1 = 0;
     uint8_t s80_m1,     s80_m2,     s81_m1;
 
-    bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr_Drive,  e80_m1, s80_m1);
-    bool ok80_2 = RoboClawReadEncoderM2(kRoboClawAddr_Drive,  e80_m2, s80_m2);
-    bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr_Strafe, e81_m1, s81_m1);
+    int32_t e80_m1 = m_lastDriveRightCount;
+    int32_t e80_m2 = m_lastDriveLeftCount;
+    int32_t e81_m1 = m_lastStrafeCount;
+    uint8_t s80_m1 = 0, s80_m2 = 0, s81_m1 = 0;
+
+    int32_t tmp80_m1 = 0, tmp80_m2 = 0, tmp81_m1 = 0;
+
+    bool ok80_1 = RoboClawReadEncoderM1(kRoboClawAddr_Drive,  tmp80_m1, s80_m1);
+    bool ok80_2 = RoboClawReadEncoderM2(kRoboClawAddr_Drive,  tmp80_m2, s80_m2);
+    bool ok81_1 = RoboClawReadEncoderM1(kRoboClawAddr_Strafe, tmp81_m1, s81_m1);
+
+    if (ok80_1) {
+        m_lastDriveRightCount = tmp80_m1;
+        e80_m1 = tmp80_m1;
+    }
+    if (ok80_2) {
+        m_lastDriveLeftCount = tmp80_m2;
+        e80_m2 = tmp80_m2;
+    }
+    if (ok81_1) {
+        m_lastStrafeCount = tmp81_m1;
+        e81_m1 = tmp81_m1;
+    }
 
     frc::SmartDashboard::PutBoolean("RC1 Encoder1 OK", ok80_1);
     frc::SmartDashboard::PutBoolean("RC1 Encoder2 OK", ok80_2);
@@ -1232,7 +1257,7 @@ void Robot::AutonomousPeriodic() {
             theta_prevError = theta_error;
 
             // Zero out axis when within tolerance (also prevents integral windup)
-            constexpr double kPosTol     = 0.002;
+            constexpr double kPosTol     = 0.01;
             constexpr double kThetaTol = 0.05; // ~3° — tight enough for accuracy, wide enough to settle
             double pos_error = std::hypot(dx_field, dy_field);
             bool pos_done = pos_error <= kPosTol;

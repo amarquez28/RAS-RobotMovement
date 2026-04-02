@@ -79,7 +79,7 @@ class Robot : public frc::TimesliceRobot {
   void DriveTankSteered(int8_t baseSpeed, double pixelError);
 
  private:
-   units::second_t m_autoStartTime{0_s};
+  units::second_t m_autoStartTime{0_s};
 
   // ── SmartDashboard / auto chooser ───────────────────────────────────────
   frc::SendableChooser<std::string> m_chooser;
@@ -125,6 +125,11 @@ class Robot : public frc::TimesliceRobot {
   void LoadAutonomousSetpoints();
   void AdvanceToNextSetpoint();
   void ResetPidState();
+
+  // Last valid raw encoder counts used by APPROACH odometry.
+  int32_t m_lastDriveRightCount = 0;   // RoboClaw 0x80 M1
+  int32_t m_lastDriveLeftCount  = 0;   // RoboClaw 0x80 M2
+  int32_t m_lastStrafeCount     = 0;   // RoboClaw 0x81 M1 (debug only)
 
   //Boolean to disable strafe in path following routine
   bool m_enableYControl = false;
