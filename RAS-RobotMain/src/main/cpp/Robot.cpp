@@ -1293,7 +1293,7 @@ void Robot::AutonomousPeriodic() {
                     }
                     double elapsed = now_s - m_servoCommandTime.value();
                     if (elapsed < kServoDwell_s) break;  // beacon settling
-                    ArmRaise();  // idempotent — called each tick during arm dwell
+                    ArmStart();  // idempotent — called each tick during arm dwell
                     if (elapsed < 2.0 * kServoDwell_s) break;  // arm moving
                     m_servoCommandTime = -1_s;
                     std::cout << "[Beacon] Deposit complete — arm raised\n";
@@ -1549,6 +1549,11 @@ void Robot::ArmRaise() {
     std::cout << "[Mechanism] ArmRaise — arm up (" << ArmServoOpenPos << " μs)\n";
 }
 
+void Robot::ArmStart() {
+    m_servoArm.SetPulseWidth(ArmServoStartPos);
+    std::cout << "[Mechanism] ArmStart — arm little up (" << ArmServoStartPos << " μs)\n";
+}
+
 // ArmLower – return the arm to the init/resting position after deposit.
 void Robot::ArmLower() {
     m_servoArm.SetPulseWidth(ArmServoInitPos);
@@ -1591,7 +1596,6 @@ void Robot::DisabledPeriodic() {}
 
 
 void Robot::TestInit() {
-    
 }
 
 

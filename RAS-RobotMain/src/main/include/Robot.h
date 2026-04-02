@@ -247,8 +247,9 @@ class Robot : public frc::TimesliceRobot {
   static constexpr int kHallServoOpenPos    = 1500;  // Open
   static constexpr int BrushServoInitPos    = 500;
   static constexpr int BrushServoOpenPos    = 1500;
-  static constexpr int ArmServoInitPos      = 1240;
-  static constexpr int ArmServoOpenPos      = 1900;
+  static constexpr int ArmServoInitPos      = 1120;
+  static constexpr int ArmServoOpenPos      = 1400; //Servo Mark is at 1500
+  static constexpr int ArmServoStartPos     = 1230; //Just lift a little for beacon not touching ground
   static constexpr int ReleaseServoInitPos  = 500;
   static constexpr int ReleaseServoOpenPos  = 1500;
   bool m_armRaised = false;
@@ -354,6 +355,7 @@ class Robot : public frc::TimesliceRobot {
   void GrabBucket   ();  // Raise arm then clamp onto collection bucket
   void ArmRaise     ();  // Raise arm to beacon-drop angle (clears arena during turns)
   void ArmLower     ();  // Lower arm back to init position after beacon is deposited
+  void ArmStart     ();
   void DepositOres  ();  // Extend actuator at full speed to push all ores out
 
   // ── Test routines ────────────────────────────────────────────────────────
