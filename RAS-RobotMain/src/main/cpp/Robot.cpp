@@ -810,6 +810,7 @@ void Robot::AutonomousPeriodic() {
 
         // Simple gating before fusion
         if (posErrVision < 1.0 && std::abs(thetaErrVision) < 0.75) {
+        //if (true) {
             frc::Pose2d visionPose{
                 units::meter_t{visionX},
                 units::meter_t{visionY},
