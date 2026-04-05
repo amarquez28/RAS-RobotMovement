@@ -810,28 +810,27 @@ void Robot::AutonomousPeriodic() {
 
         // Simple gating before fusion
         if (posErrVision < 1.0 && std::abs(thetaErrVision) < 0.75) {
-        //if (true) {
             frc::Pose2d visionPose{
                 units::meter_t{visionX},
                 units::meter_t{visionY},
                 frc::Rotation2d{units::radian_t{visionTheta}}
             };
 
-        auto visionStdDevs = GetVisionStdDevsFromConfidence(visionConf);
+            auto visionStdDevs = GetVisionStdDevsFromConfidence(visionConf);
 
-        field_poseEstimator.AddVisionMeasurement(
-            visionPose,
-            units::second_t{static_cast<double>(visionTsUs) / 1e6},
-            visionStdDevs
-        );
+            field_poseEstimator.AddVisionMeasurement(
+                visionPose,
+                units::second_t{static_cast<double>(visionTsUs) / 1e6},
+                visionStdDevs
+                );
 
-        visionFused = true;
+            visionFused = true;
 
-        // Refresh fused pose after adding vision
-        estPose = field_poseEstimator.GetEstimatedPosition();
-        x_pos = estPose.X().value();
-        y_pos = estPose.Y().value();
-        theta_pos = estPose.Rotation().Radians().value();
+            // Refresh fused pose after adding vision
+            estPose = field_poseEstimator.GetEstimatedPosition();
+            x_pos = estPose.X().value();
+            y_pos = estPose.Y().value();
+            theta_pos = estPose.Rotation().Radians().value();
         }
     }
 
