@@ -464,6 +464,9 @@ void Robot::StartAutoCsvLog() {
         << "odom_x,odom_y,odom_theta,"
         << "vision_pose_valid,vision_pose_new,vision_x,vision_y,vision_theta,vision_conf,vision_ts_us,"
         << "vision_timestamp_ok,vision_latency_ms,vision_fused,"
+        << "vision_pos_err_to_odom,vision_theta_err_to_odom,"
+        << "vision_gate_pose_valid,vision_gate_pose_new,vision_gate_timestamp_ok,"
+        << "vision_gate_pos_ok,vision_gate_theta_ok,"
         << "fused_x,fused_y,fused_theta,"
         << "auto_phase,waypoint_index,"
         << "has_tag,tag_id,tag_ts_us,"
@@ -506,6 +509,14 @@ void Robot::LogAutoCsvRow(
     double visionLatencyMs,
     bool visionFused,
 
+    double visionPosErrToOdom,
+    double visionThetaErrToOdom,
+    bool visionGatePoseValid,
+    bool visionGatePoseNew,
+    bool visionGateTimestampOk,
+    bool visionGatePosOk,
+    bool visionGateThetaOk,
+
     double fusedX,
     double fusedY,
     double fusedTheta,
@@ -544,6 +555,12 @@ void Robot::LogAutoCsvRow(
         << (visionPoseNew ? 1 : 0) << ","
         << visionX << "," << visionY << "," << visionTheta << "," << visionConf << "," << visionTsUs << ","
         << (visionTimestampOk ? 1 : 0) << "," << visionLatencyMs << "," << (visionFused ? 1 : 0) << ","
+        << visionPosErrToOdom << "," << visionThetaErrToOdom << ","
+        << (visionGatePoseValid ? 1 : 0) << ","
+        << (visionGatePoseNew ? 1 : 0) << ","
+        << (visionGateTimestampOk ? 1 : 0) << ","
+        << (visionGatePosOk ? 1 : 0) << ","
+        << (visionGateThetaOk ? 1 : 0) << ","
         << fusedX << "," << fusedY << "," << fusedTheta << ","
         << "\"" << autoPhase << "\"" << "," << waypointIndex << ","
         << (hasTag ? 1 : 0) << "," << tagId << "," << tagTsUs << ","
@@ -790,6 +807,14 @@ void Robot::AutonomousPeriodic() {
     double visionTheta   = fieldPose.theta;
     double visionConf    = fieldPose.confidence;
     int64_t visionTsUs   = fieldPose.timestamp_us;
+    double visionPosErrToOdom = -1.0;
+    double visionThetaErrToOdom = -1.0;
+
+    bool visionGatePoseValid = visionPoseValid;
+    bool visionGatePoseNew = visionPoseNew;
+    bool visionGateTimestampOk = false;
+    bool visionGatePosOk = false;
+    bool visionGateThetaOk = false;
 
     // Vision Pose estimation
     bool visionFused = false;
@@ -797,12 +822,16 @@ void Robot::AutonomousPeriodic() {
     double visionLatencyMs = -1.0;
 
     if (visionTsUs > 0) {
-            int64_t fpgaNowUs =
+        int64_t fpgaNowUs =
             static_cast<int64_t>(frc::Timer::GetFPGATimestamp().value() * 1e6);
-            visionLatencyMs = (fpgaNowUs - visionTsUs) / 1000.0;
-
+        visionLatencyMs = (fpgaNowUs - visionTsUs) / 1000.0;
         visionTimestampOk = (visionLatencyMs >= 0.0 && visionLatencyMs < 250.0);
-        }
+    }
+
+    visionGateTimestampOk = visionTimestampOk;
+
+    int64_t fpgaNowUsDbg = static_cast<int64_t>(frc::Timer::GetFPGATimestamp().value() * 1e6);
+    frc::SmartDashboard::PutNumber("VisionDbg/RioNowUs", static_cast<double>(fpgaNowUsDbg));
 
     if (visionPoseValid && visionPoseNew && visionTimestampOk) {
         double dxVision = visionX - x_pos;
@@ -810,8 +839,14 @@ void Robot::AutonomousPeriodic() {
         double posErrVision = std::hypot(dxVision, dyVision);
         double thetaErrVision = WrapAngle(visionTheta - theta_pos);
 
+        visionPosErrToOdom = posErrVision;
+        visionThetaErrToOdom = thetaErrVision;
+
+        visionGatePosOk = (posErrVision < 1.0);
+        visionGateThetaOk = (std::abs(thetaErrVision) < 0.75);
+
         // Simple gating before fusion
-        if (posErrVision < 1.0 && std::abs(thetaErrVision) < 0.75) {
+        if (visionGatePosOk && visionGateThetaOk) {
             frc::Pose2d visionPose{
                 units::meter_t{visionX},
                 units::meter_t{visionY},
@@ -824,7 +859,7 @@ void Robot::AutonomousPeriodic() {
                 visionPose,
                 units::second_t{static_cast<double>(visionTsUs) / 1e6},
                 visionStdDevs
-                );
+            );
 
             visionFused = true;
 
@@ -1478,6 +1513,14 @@ void Robot::AutonomousPeriodic() {
         visionTimestampOk,
         visionLatencyMs,
         visionFused,
+
+        visionPosErrToOdom,
+        visionThetaErrToOdom,
+        visionGatePoseValid,
+        visionGatePoseNew,
+        visionGateTimestampOk,
+        visionGatePosOk,
+        visionGateThetaOk,
 
         x_pos,
         y_pos,
