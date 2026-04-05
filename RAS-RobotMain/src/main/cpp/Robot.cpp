@@ -442,6 +442,8 @@ void Robot::StartAutoCsvLog() {
 
     std::filesystem::create_directories("/home/lvuser/logs");
 
+    system("ls -t /home/lvuser/logs/*.csv 2>/dev/null | tail -n +6 | xargs -r rm");
+
     auto nowUs = static_cast<int64_t>(frc::Timer::GetFPGATimestamp().value() * 1e6);
 
     std::ostringstream path;
