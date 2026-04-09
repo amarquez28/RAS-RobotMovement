@@ -584,6 +584,33 @@ void Robot::RobotPeriodic() {
     // Single IMU read / integration source for all modes
     IMUUpdate();
 
+    static auto inst  = nt::NetworkTableInstance::GetDefault();
+    static auto table = inst.GetTable("Vision");
+
+    static auto piSyncReqSeqSub   = table->GetIntegerTopic("pi_sync_req_seq").Subscribe(-1);
+    static auto piSyncReqPiUsSub  = table->GetIntegerTopic("pi_sync_req_pi_us").Subscribe(-1);
+
+    static auto rioSyncRespSeqPub      = table->GetIntegerTopic("rio_sync_resp_seq").Publish();
+    static auto rioSyncRespPiUsEchoPub = table->GetIntegerTopic("rio_sync_resp_pi_us_echo").Publish();
+    static auto rioSyncRespRioUsPub    = table->GetIntegerTopic("rio_sync_resp_rio_us").Publish();
+    static auto rioNowUsPub            = table->GetIntegerTopic("rio_now_us").Publish();
+
+    static int64_t lastHandledReqSeq = -1;
+
+    int64_t reqSeq  = piSyncReqSeqSub.Get();
+    int64_t reqPiUs = piSyncReqPiUsSub.Get();
+
+    int64_t rioNowUs = static_cast<int64_t>(frc::Timer::GetFPGATimestamp().value() * 1e6);
+    rioNowUsPub.Set(rioNowUs);
+
+    if (reqSeq >= 0 && reqSeq != lastHandledReqSeq && reqPiUs > 0) {
+        lastHandledReqSeq = reqSeq;
+
+        rioSyncRespSeqPub.Set(reqSeq);
+        rioSyncRespPiUsEchoPub.Set(reqPiUs);
+        rioSyncRespRioUsPub.Set(rioNowUs);
+    }
+
     // Vision dashboard
     m_aprilTagReader.UpdateDashboard();
 
