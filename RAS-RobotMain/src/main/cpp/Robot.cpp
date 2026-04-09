@@ -471,6 +471,7 @@ void Robot::StartAutoCsvLog() {
         << "auto_phase,waypoint_index,"
         << "has_tag,tag_id,tag_ts_us,"
         << "sync_delta_ms,"
+        << "sync_good_nt,sync_est_offset_us_nt,sync_last_rtt_us_nt,sync_sample_count_nt,"
         << "x_target,y_target,theta_target,"
         << "x_error,y_error,theta_error,"
         << "v_cmd,omega_cmd,"
@@ -528,6 +529,11 @@ void Robot::LogAutoCsvRow(
     int tagId,
     int64_t tagTsUs,
 
+    bool syncGoodNt,
+    double syncEstOffsetUsNt,
+    double syncLastRttUsNt,
+    double syncSampleCountNt,
+
     double xTarget,
     double yTarget,
     double thetaTarget,
@@ -565,6 +571,10 @@ void Robot::LogAutoCsvRow(
         << "\"" << autoPhase << "\"" << "," << waypointIndex << ","
         << (hasTag ? 1 : 0) << "," << tagId << "," << tagTsUs << ","
         << syncDeltaMs << ","
+        << (syncGoodNt ? 1 : 0) << ","
+        << syncEstOffsetUsNt << ","
+        << syncLastRttUsNt << ","
+        << syncSampleCountNt << ","
         << xTarget << "," << yTarget << "," << thetaTarget << ","
         << xError << "," << yError << "," << thetaError << ","
         << vCmd << "," << omegaCmd << ","
@@ -824,6 +834,14 @@ void Robot::AutonomousPeriodic() {
         if (tag.distance <= 0.0) hasTag = false; // reject invalid pose estimate
     }
 
+    static auto instSync  = nt::NetworkTableInstance::GetDefault();
+    static auto tableSync = instSync.GetTable("Vision");
+
+    static auto syncGoodSub = tableSync->GetBooleanTopic("sync_good").Subscribe(false);
+    static auto syncEstOffsetSub = tableSync->GetDoubleTopic("sync_est_offset_us").Subscribe(-1.0);
+    static auto syncLastRttSub = tableSync->GetDoubleTopic("sync_last_rtt_us").Subscribe(-1.0);
+    static auto syncSampleCountSub = tableSync->GetIntegerTopic("sync_sample_count").Subscribe(-1);
+
     // ── 6b. Read field pose from Pi and optionally fuse it ────────────────
     FieldPose fieldPose = m_aprilTagReader.GetFieldPose();
 
@@ -897,6 +915,11 @@ void Robot::AutonomousPeriodic() {
             theta_pos = estPose.Rotation().Radians().value();
         }
     }
+
+    bool syncGoodNt = syncGoodSub.Get();
+    double syncEstOffsetUsNt = syncEstOffsetSub.Get();
+    double syncLastRttUsNt = syncLastRttSub.Get();
+    double syncSampleCountNt = static_cast<double>(syncSampleCountSub.Get());
 
     //CSV VARIABLES
     std::string autoPhaseStr = "APPROACH";
@@ -1559,6 +1582,11 @@ void Robot::AutonomousPeriodic() {
         hasTag,
         tagIdForLog,
         tagTsUsForLog,
+
+        syncGoodNt,
+        syncEstOffsetUsNt,
+        syncLastRttUsNt,
+        syncSampleCountNt,
 
         x_target_log,
         y_target_log,

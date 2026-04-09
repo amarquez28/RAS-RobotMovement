@@ -411,6 +411,11 @@ class Robot : public frc::TimesliceRobot {
     int tagId,
     int64_t tagTsUs,
 
+    bool syncGoodNt,
+    double syncEstOffsetUsNt,
+    double syncLastRttUsNt,
+    double syncSampleCountNt,
+
     double xTarget,
     double yTarget,
     double thetaTarget,
